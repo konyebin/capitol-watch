@@ -1,0 +1,32 @@
+name: Ingest congressional trades
+
+# Scrapes the Senate eFD and upserts into Supabase on a schedule.
+# Requires repo secret SUPABASE_SERVICE_KEY (Supabase -> Settings -> API -> service_role / secret key).
+# Assumes this repo's root is the capitol-watch folder (adjust the path below otherwise).
+
+on:
+  schedule:
+    - cron: "17 6 * * *"      # every day at 06:17 UTC
+  workflow_dispatch: {}        # allow manual runs from the Actions tab
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scrape + upsert
+        env:
+          SUPABASE_URL: https://bywwvjljyhfpxpaestta.supabase.co
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}   # optional: real sectors
+        run: |
+          python ingest/ingest.py \
+            --since "$(date -u -d '45 days ago' +%m/%d/%Y)" \
+            --max-reports 120
