@@ -29,7 +29,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://bywwvjljyhfpxpaestta.supa
 TABLE = "congress_trades"
 EFD = "https://efdsearch.senate.gov"
 ROSTER_URL = "https://unitedstates.github.io/congress-legislators/legislators-current.json"
-FINNHUB_KEY = os.environ.get("FINNHUB_API_KEY", "")
+FINNHUB_KEY = (os.environ.get("FINNHUB_API_KEY") or "").strip()
 CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sector_cache.json")
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36"
 
@@ -302,7 +302,7 @@ def main():
     sectored = sum(1 for r in rows if r["sector"] != "Other")
     log("normalized trades: %d (%d with a known sector)" % (len(rows), sectored))
 
-    key = os.environ.get("SUPABASE_SERVICE_KEY")
+    key = (os.environ.get("SUPABASE_SERVICE_KEY") or "").strip()
     if a.dry_run or not key:
         if rows:
             with open(a.out, "w", newline="", encoding="utf-8") as f:
