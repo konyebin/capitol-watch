@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Capitol Watch — Congressional Trade Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;0,900;1,500;1,700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root{
+    --bg:#F7F5F0;
+    --header:#1A1714;
+    --accent:#C8873A;
+    --accent-soft:#e9d4b3;
+    --buy:#2D6A4F;
+    --buy-soft:#dcebe3;
+    --sell:#C1392B;
+    --sell-soft:#f3dcd8;
+    --ink:#1A1714;
+    --muted:#736a5d;
+    --faint:#a99f8f;
+    --line:#e5dfd2;
+    --line-strong:#d6cdba;
+    --surface:#FFFDF8;
+    --surface-2:#f1ece1;
+    --party-d:#33608f;
+    --party-r:#a23b34;
+    --party-i:#6b6357;
+    --radius:14px;
+    --radius-sm:9px;
+    --shadow:0 1px 2px rgba(26,23,20,.05), 0 8px 24px -16px rgba(26,23,20,.35);
+    --maxw:560px;
+    --ease:cubic-bezier(0.16,1,0.3,1);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'DM Sans',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  #root{min-height:100vh;}
+  button{font-family:inherit;cursor:pointer;}
+  input{font-family:inherit;}
+  ::selection{background:var(--accent-soft);}
+
+  .shell{
+    max-width:var(--maxw);
+    margin:0 auto;
+    min-height:100vh;
+    background:var(--bg);
+    position:relative;
+    padding-bottom:84px;
+    box-shadow:0 0 60px -30px rgba(26,23,20,.4);
+  }
+
+  /* ---------- Header ---------- */
+  .hdr{
+    background:var(--header);
+    color:#f3ead9;
+    padding:18px 20px 16px;
+    position:sticky;top:0;z-index:30;
+    border-bottom:2px solid var(--accent);
+  }
+  .hdr-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+  .hdr-title{
+    font-family:'Playfair Display',serif;
+    font-weight:800;
+    font-size:27px;
+    line-height:1.0;
+    letter-spacing:-.01em;
+    margin:0;
+    color:#fbf4e6;
+  }
+  .hdr-title .dot{color:var(--accent);}
+  .hdr-sub{
+    margin:6px 0 0;
+    font-size:11.5px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:#b3a895;
+    font-weight:500;
+  }
+  .status{display:flex;gap:10px;align-items:flex-start;flex-shrink:0;}
+  .status-item{display:flex;flex-direction:column;align-items:center;gap:4px;width:30px;}
+  .status-dot{width:9px;height:9px;border-radius:50%;background:var(--faint);position:relative;}
+  .status-dot.live{background:#52b788;box-shadow:0 0 0 3px rgba(82,183,136,.18);}
+  .status-dot.error{background:#d0563f;box-shadow:0 0 0 3px rgba(208,86,63,.18);}
+  .status-dot.loading{background:#caa35f;animation:pulse 1.1s var(--ease) infinite;}
+  @keyframes pulse{0%,100%{opacity:.4;}50%{opacity:1;}}
+  .status-label{font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:#8f8472;font-weight:500;}
+  .refresh-btn{margin-top:8px;display:inline-flex;align-items:center;gap:5px;background:rgba(255,253,248,.07);border:1px solid #3d3225;color:#b3a895;font-size:10.5px;font-weight:600;letter-spacing:.03em;padding:4px 9px;border-radius:7px;cursor:pointer;transition:.15s var(--ease);}
+  .refresh-btn:active{transform:scale(.96);}
+  .refresh-ico{display:inline-block;font-size:12px;line-height:1;color:var(--accent);}
+  .refresh-ico.spin{animation:spin .8s linear infinite;}
+
+  /* ---------- Generic ---------- */
+  .view{padding:18px 16px 8px;animation:fade .35s var(--ease);}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+  .eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:0 0 4px;}
+  .section-title{font-family:'Playfair Display',serif;font-weight:700;font-size:21px;margin:0 0 2px;letter-spacing:-.01em;}
+  .section-note{font-size:12.5px;color:var(--muted);margin:0 0 14px;line-height:1.45;}
+  .mono{font-family:'DM Mono',monospace;}
+  .stack{display:flex;flex-direction:column;gap:11px;}
+  .empty{padding:38px 18px;text-align:center;color:var(--muted);font-size:14px;line-height:1.5;}
+  .empty .big{font-size:34px;display:block;margin-bottom:8px;opacity:.5;}
+
+  /* ---------- Filter bar ---------- */
+  .searchbar{
+    display:flex;align-items:center;gap:8px;
+    background:var(--surface);border:1px solid var(--line-strong);
+    border-radius:11px;padding:10px 12px;margin-bottom:12px;
+  }
+  .searchbar input{border:0;outline:0;background:transparent;flex:1;font-size:14.5px;color:var(--ink);min-width:0;}
+  .searchbar svg{flex-shrink:0;color:var(--faint);}
+  .filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+  .chip{
+    border:1px solid var(--line-strong);background:var(--surface);
+    color:var(--muted);font-size:12.5px;font-weight:600;
+    padding:7px 12px;border-radius:999px;transition:.18s var(--ease);
+    min-height:34px;
+  }
+  .chip:active{transform:scale(.96);}
+  .chip.on{background:var(--ink);color:#f7f1e4;border-color:var(--ink);}
+  .chip.on.buy{background:var(--buy);border-color:var(--buy);}
+  .chip.on.sell{background:var(--sell);border-color:var(--sell);}
+  .filter-group{display:flex;gap:6px;flex-wrap:wrap;}
+  .filter-label{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:700;align-self:center;margin-right:2px;}
+  .result-count{font-size:11.5px;color:var(--faint);margin:-4px 0 12px;font-weight:500;}
+
+  /* ---------- Trade card ---------- */
+  .tcard{
+    position:relative;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:13px 14px;box-shadow:var(--shadow);
+    display:flex;gap:12px;align-items:stretch;
+    transition:transform .14s var(--ease), box-shadow .2s var(--ease);
+    text-align:left;width:100%;color:inherit;
+    touch-action:pan-y;overflow:hidden;
+  }
+  .tcard:active{transform:scale(.985);}
+  .tcard.swiped{box-shadow:0 1px 2px rgba(26,23,20,.05), 0 12px 30px -14px rgba(26,23,20,.45);}
+  .tcard-side{width:4px;border-radius:4px;flex-shrink:0;}
+  .tcard-side.buy{background:var(--buy);}
+  .tcard-side.sell{background:var(--sell);}
+  .tcard-body{flex:1;min-width:0;}
+  .tcard-top{display:flex;align-items:center;gap:7px;margin-bottom:7px;flex-wrap:wrap;}
+  .pill{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 7px;border-radius:6px;}
+  .pill.buy{background:var(--buy-soft);color:var(--buy);}
+  .pill.sell{background:var(--sell-soft);color:var(--sell);}
+  .member-name{font-weight:700;font-size:14.5px;color:var(--ink);}
+  .party{font-size:10px;font-weight:700;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;color:#fff;flex-shrink:0;}
+  .party.D{background:var(--party-d);}
+  .party.R{background:var(--party-r);}
+  .party.I{background:var(--party-i);}
+  .tcard-tick{display:flex;align-items:baseline;gap:8px;}
+  .ticker{font-family:'DM Mono',monospace;font-weight:500;font-size:19px;letter-spacing:.02em;color:var(--ink);}
+  .company{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tcard-meta{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;}
+  .amount{font-family:'DM Mono',monospace;font-size:12.5px;color:var(--ink);font-weight:500;}
+  .sector-tag{font-size:10.5px;color:var(--muted);background:var(--surface-2);padding:2px 7px;border-radius:5px;}
+  .tcard-right{display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;flex-shrink:0;gap:6px;}
+  .age{font-size:11.5px;color:var(--faint);font-weight:600;white-space:nowrap;}
+  .flag{font-size:10px;font-weight:700;color:var(--sell);background:var(--sell-soft);padding:3px 7px;border-radius:6px;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;}
+  .src-tag{font-size:9.5px;color:var(--faint);letter-spacing:.05em;text-transform:uppercase;font-weight:600;}
+
+  /* ---------- Bottom sheet ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(26,23,20,.42);z-index:60;animation:fade .25s var(--ease);backdrop-filter:blur(2px);}
+  .sheet{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:var(--maxw);
+    background:var(--bg);border-radius:22px 22px 0 0;z-index:61;
+    padding:8px 0 26px;max-height:90vh;overflow-y:auto;
+    animation:slideup .34s var(--ease);box-shadow:0 -10px 40px -12px rgba(26,23,20,.5);
+  }
+  @keyframes slideup{from{transform:translate(-50%,100%);}to{transform:translate(-50%,0);}}
+  .sheet-grab{width:38px;height:4px;border-radius:4px;background:var(--line-strong);margin:8px auto 4px;}
+  .sheet-inner{padding:8px 20px 0;}
+  .sheet-x{position:absolute;top:14px;right:16px;border:0;background:var(--surface-2);width:30px;height:30px;border-radius:50%;color:var(--muted);font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center;}
+  .detail-head{display:flex;align-items:center;gap:9px;margin:6px 0 2px;flex-wrap:wrap;}
+  .detail-ticker{font-family:'DM Mono',monospace;font-size:32px;font-weight:500;}
+  .detail-company{font-size:13.5px;color:var(--muted);margin-bottom:16px;}
+  .kv{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);gap:14px;}
+  .kv:last-child{border-bottom:0;}
+  .kv-k{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:600;}
+  .kv-v{font-size:14px;font-weight:600;text-align:right;color:var(--ink);}
+  .kv-v.mono{font-family:'DM Mono',monospace;font-weight:500;}
+  .conflict-box{background:var(--sell-soft);border:1px solid #e7bdb4;border-radius:var(--radius-sm);padding:13px 14px;margin:16px 0 4px;}
+  .conflict-box .ct{font-weight:700;color:var(--sell);font-size:13px;margin-bottom:5px;display:flex;align-items:center;gap:6px;}
+  .conflict-box .cd{font-size:12.5px;color:#6e3b33;line-height:1.5;}
+  .lag-note{font-size:12px;color:var(--muted);background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 12px;margin-top:14px;line-height:1.45;}
+  .lag-note b{color:var(--ink);}
+  .linklike{color:var(--accent);font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer;background:none;border:0;padding:0;font-size:inherit;}
+
+  /* ---------- Member / committee rows ---------- */
+  .row{
+    display:flex;align-items:center;gap:12px;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px;
+    box-shadow:var(--shadow);width:100%;text-align:left;color:inherit;transition:transform .14s var(--ease);
+  }
+  .row:active{transform:scale(.99);}
+  .row-main{flex:1;min-width:0;}
+  .row-name{font-weight:700;font-size:15px;display:flex;align-items:center;gap:7px;}
+  .row-sub{font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;}
+  .row-sub .conf{color:var(--sell);font-weight:600;}
+  .star{border:0;background:none;font-size:21px;line-height:1;color:var(--faint);padding:6px;flex-shrink:0;transition:transform .15s var(--ease);}
+  .star.on{color:var(--accent);}
+  .star:active{transform:scale(1.25);}
+  .chev{color:var(--faint);flex-shrink:0;}
+  .mini-stat{display:flex;flex-direction:column;align-items:center;flex-shrink:0;padding:0 4px;}
+  .mini-stat .n{font-family:'DM Mono',monospace;font-size:16px;font-weight:500;}
+  .mini-stat .l{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);}
+
+  /* ---------- Profile ---------- */
+  .back{display:inline-flex;align-items:center;gap:5px;border:0;background:none;color:var(--muted);font-size:13px;font-weight:600;padding:2px 0;margin-bottom:10px;}
+  .profile-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px;}
+  .profile-name{font-family:'Playfair Display',serif;font-weight:800;font-size:26px;line-height:1.05;letter-spacing:-.01em;margin:0;}
+  .profile-meta{font-size:13px;color:var(--muted);margin:6px 0 0;display:flex;gap:9px;align-items:center;flex-wrap:wrap;}
+  .badge{display:inline-flex;align-items:center;gap:5px;background:var(--surface-2);padding:3px 9px;border-radius:6px;font-size:11.5px;font-weight:600;color:var(--muted);}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 15px;box-shadow:var(--shadow);margin-bottom:14px;}
+  .card-h{font-family:'Playfair Display',serif;font-weight:700;font-size:16.5px;margin:0 0 11px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .card-h .cnt{font-family:'DM Sans';font-size:11px;font-weight:700;color:var(--faint);letter-spacing:.05em;}
+  .comm-item{padding:10px 0;border-bottom:1px solid var(--line);}
+  .comm-item:first-of-type{padding-top:0;}
+  .comm-item:last-child{border-bottom:0;padding-bottom:0;}
+  .comm-name{font-weight:600;font-size:13.5px;}
+  .comm-reg{font-size:11.5px;color:var(--muted);margin-top:3px;}
+  .reg-tag{display:inline-block;font-size:10.5px;background:var(--accent-soft);color:#8a5a1e;padding:2px 7px;border-radius:5px;margin:3px 4px 0 0;font-weight:600;}
+  .conf-line{font-size:12.5px;color:#6e3b33;line-height:1.5;padding:8px 0;border-bottom:1px dashed #e7c9c1;}
+  .conf-line:last-child{border-bottom:0;}
+  .conf-line b{color:var(--sell);}
+
+  /* ---------- AI panel ---------- */
+  .ai{
+    background:linear-gradient(160deg,#211c17,#312820);
+    border-radius:var(--radius);padding:15px 15px 16px;margin:6px 0 16px;
+    color:#efe6d6;border:1px solid #3d3225;
+  }
+  .ai-h{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+  .ai-h .spark{color:var(--accent);}
+  .ai-title{font-family:'Playfair Display',serif;font-weight:700;font-size:16px;color:#f6eede;}
+  .ai-desc{font-size:11.5px;color:#b3a895;margin:0 0 12px;line-height:1.45;}
+  .ai-btn{
+    background:var(--accent);color:#1a1510;border:0;font-weight:700;font-size:13px;
+    padding:10px 16px;border-radius:9px;display:inline-flex;align-items:center;gap:7px;
+    transition:.18s var(--ease);min-height:40px;
+  }
+  .ai-btn:active{transform:scale(.97);}
+  .ai-btn:disabled{opacity:.6;}
+  .ai-out{
+    background:rgba(255,253,248,.06);border:1px solid #463a2b;border-radius:10px;
+    padding:13px 14px;margin-top:13px;font-size:13.5px;line-height:1.6;color:#ece2d1;
+    white-space:pre-wrap;animation:fade .3s var(--ease);
+  }
+  .ai-out p{margin:0 0 9px;}
+  .ai-out p:last-child{margin:0;}
+  .ai-err{margin-top:12px;font-size:12px;color:#e6b9ad;background:rgba(193,57,43,.16);border:1px solid #6e3127;padding:10px 12px;border-radius:9px;line-height:1.45;}
+  .ai-ask{display:flex;gap:7px;margin-top:12px;}
+  .ai-ask input{flex:1;min-width:0;background:rgba(255,253,248,.07);border:1px solid #463a2b;border-radius:9px;color:#f3ead9;padding:10px 12px;font-size:13px;outline:0;}
+  .ai-ask input::placeholder{color:#8f8472;}
+  .ai-ask button{background:rgba(200,135,58,.18);color:var(--accent);border:1px solid #5e4a2e;border-radius:9px;padding:0 14px;font-weight:700;font-size:13px;}
+  .ai-spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(26,21,16,.35);border-top-color:#1a1510;border-radius:50%;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .ai-loading{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#b3a895;margin-top:13px;}
+  .ai-loading .d{width:12px;height:12px;border:2px solid #5e4a2e;border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+
+  /* ---------- Trends ---------- */
+  .bar-row{margin-bottom:11px;}
+  .bar-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;gap:10px;}
+  .bar-label{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;}
+  .bar-label .tk{font-family:'DM Mono',monospace;}
+  .bar-val{font-family:'DM Mono',monospace;font-size:11.5px;color:var(--muted);}
+  .bar-track{height:9px;background:var(--surface-2);border-radius:6px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:6px;transition:width .6s var(--ease);}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+  .leader{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--line);}
+  .leader:last-child{border-bottom:0;}
+  .leader .rk{font-family:'DM Mono',monospace;font-size:12px;color:var(--faint);width:16px;}
+  .leader .tk{font-family:'DM Mono',monospace;font-weight:500;font-size:14px;}
+  .leader .who{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .leader .amt{font-family:'DM Mono',monospace;font-size:11px;margin-left:auto;color:var(--ink);}
+  .party-split{display:flex;height:30px;border-radius:9px;overflow:hidden;margin:4px 0 8px;font-size:12px;font-weight:700;color:#fff;}
+  .party-split .d{background:var(--party-d);display:flex;align-items:center;justify-content:center;}
+  .party-split .r{background:var(--party-r);display:flex;align-items:center;justify-content:center;}
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+  .stat-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 6px;text-align:center;box-shadow:var(--shadow);}
+  .stat-box .n{font-family:'Playfair Display',serif;font-size:23px;font-weight:800;line-height:1;}
+  .stat-box .l{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin-top:5px;font-weight:600;}
+
+  /* ---------- Bottom nav ---------- */
+  .nav{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:var(--maxw);
+    background:rgba(247,245,240,.93);backdrop-filter:blur(14px);
+    border-top:1px solid var(--line-strong);z-index:40;
+    display:flex;justify-content:space-around;padding:7px 4px calc(7px + env(safe-area-inset-bottom));
+  }
+  .nav-btn{
+    border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;
+    color:var(--faint);font-size:9.5px;font-weight:600;letter-spacing:.02em;
+    padding:5px 10px;border-radius:10px;flex:1;transition:.16s var(--ease);min-height:48px;justify-content:center;
+  }
+  .nav-btn.on{color:var(--ink);}
+  .nav-btn.on .ni{color:var(--accent);transform:translateY(-1px);}
+  .nav-btn:active{transform:scale(.92);}
+  .ni{transition:.16s var(--ease);}
+  .nav-badge{position:absolute;}
+
+  .footer-note{font-size:10.5px;color:var(--faint);text-align:center;line-height:1.5;padding:20px 24px 6px;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- App source kept as text/plain so Babel's auto-runner (which defaults to the
+     automatic JSX runtime and emits illegal `import` statements in a non-module
+     script) ignores it. The bootstrap at the end transpiles it with the classic
+     runtime (React.createElement) instead. -->
+<script type="text/plain" id="app-src">
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+/* ============================================================
+   CONFIG
+============================================================ */
+/* Live data source: Supabase (PostgREST REST API, queried directly from the
+   browser). The publishable key is client-safe — it is gated by Row-Level
+   Security, which only permits SELECT on congress_trades. Never put an
+   sb_secret_ / service_role key here. */
+const SUPABASE_URL = "https://bywwvjljyhfpxpaestta.supabase.co";
+const SUPABASE_KEY = "sb_publishable_QPVICgjDotbL881PpHRT_A_k83FMnyi";
+const TRADES_TABLE = "congress_trades";
+const AI_MODEL = "claude-sonnet-4-20250514";
+const WATCH_KEY = "capitolwatch.watchlist.v1";
+
+/* ============================================================
+   PERSISTENCE  (window.storage with graceful fallbacks)
+============================================================ */
+const store = {
+  async get(key){
+    try{
+      const s = (typeof window !== "undefined") && window.storage;
+      if (s){
+        if (typeof s.getItem === "function") return await s.getItem(key);
+        if (typeof s.get === "function")     return await s.get(key);
+      }
+      return localStorage.getItem(key);
+    }catch(e){ return null; }
+  },
+  async set(key, val){
+    try{
+      const s = (typeof window !== "undefined") && window.storage;
+      if (s){
+        if (typeof s.setItem === "function") return await s.setItem(key, val);
+        if (typeof s.set === "function")     return await s.set(key, val);
+      }
+      localStorage.setItem(key, val);
+    }catch(e){ /* non-fatal */ }
+  }
+};
+
+/* ============================================================
+   CLAUDE (Anthropic Messages API — browser-direct)
+   Works in the Claude artifact env (key injected). Elsewhere it
+   fails softly and the panels show a friendly message.
+============================================================ */
+const ANALYST_SYSTEM =
+  "You are a nonpartisan congressional-trading analyst for a newsroom tool called Capitol Watch. " +
+  "Be concise, factual and neutral. Use short paragraphs. When trades overlap a committee's jurisdiction, " +
+  "describe it as a 'potential conflict worth scrutiny' rather than asserting wrongdoing. " +
+  "Never invent trades beyond the data provided.";
+
+async function askClaude(userPrompt){
+  // Older artifact harness
+  if (typeof window !== "undefined" && window.claude && typeof window.claude.complete === "function"){
+    const r = await window.claude.complete(ANALYST_SYSTEM + "\n\n" + userPrompt);
+    return typeof r === "string" ? r : (r && (r.completion || r.text)) || "No response.";
+  }
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{
+      "content-type":"application/json",
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      max_tokens: 900,
+      system: ANALYST_SYSTEM,
+      messages:[{ role:"user", content:userPrompt }]
+    })
+  });
+  if(!res.ok) throw new Error("API " + res.status);
+  const data = await res.json();
+  return (data.content || []).map(b => b.text || "").join("").trim() || "No response.";
+}
+
+/* ============================================================
+   REFERENCE DATA
+============================================================ */
+const TICKERS = {
+  LMT:{n:"Lockheed Martin",s:"Defense"}, RTX:{n:"RTX Corporation",s:"Defense"},
+  NOC:{n:"Northrop Grumman",s:"Defense"}, GD:{n:"General Dynamics",s:"Defense"},
+  BA:{n:"Boeing",s:"Defense"},
+  AAPL:{n:"Apple",s:"Technology"}, MSFT:{n:"Microsoft",s:"Technology"},
+  NVDA:{n:"NVIDIA",s:"Technology"}, GOOGL:{n:"Alphabet",s:"Technology"},
+  META:{n:"Meta Platforms",s:"Technology"}, AMZN:{n:"Amazon",s:"Technology"},
+  AVGO:{n:"Broadcom",s:"Technology"}, AMD:{n:"Advanced Micro Devices",s:"Technology"},
+  PLTR:{n:"Palantir",s:"Technology"},
+  JPM:{n:"JPMorgan Chase",s:"Financials"}, GS:{n:"Goldman Sachs",s:"Financials"},
+  BAC:{n:"Bank of America",s:"Financials"}, WFC:{n:"Wells Fargo",s:"Financials"},
+  MS:{n:"Morgan Stanley",s:"Financials"}, V:{n:"Visa",s:"Financials"},
+  PFE:{n:"Pfizer",s:"Healthcare"}, JNJ:{n:"Johnson & Johnson",s:"Healthcare"},
+  LLY:{n:"Eli Lilly",s:"Healthcare"}, UNH:{n:"UnitedHealth Group",s:"Healthcare"},
+  MRNA:{n:"Moderna",s:"Healthcare"}, ABBV:{n:"AbbVie",s:"Healthcare"},
+  XOM:{n:"ExxonMobil",s:"Energy"}, CVX:{n:"Chevron",s:"Energy"},
+  COP:{n:"ConocoPhillips",s:"Energy"}, OXY:{n:"Occidental Petroleum",s:"Energy"},
+  T:{n:"AT&T",s:"Telecom"}, VZ:{n:"Verizon",s:"Telecom"}, TMUS:{n:"T-Mobile US",s:"Telecom"},
+  NKE:{n:"Nike",s:"Consumer"}, DIS:{n:"Walt Disney",s:"Consumer"},
+  SBUX:{n:"Starbucks",s:"Consumer"}, TSLA:{n:"Tesla",s:"Consumer"}
+};
+
+const MEMBERS = {
+  "Tommy Tuberville":{party:"R",state:"AL",chamber:"Senate"},
+  "Mark Warner":{party:"D",state:"VA",chamber:"Senate"},
+  "Susan Collins":{party:"R",state:"ME",chamber:"Senate"},
+  "Sheldon Whitehouse":{party:"D",state:"RI",chamber:"Senate"},
+  "Rick Scott":{party:"R",state:"FL",chamber:"Senate"},
+  "Ron Wyden":{party:"D",state:"OR",chamber:"Senate"},
+  "Shelley Moore Capito":{party:"R",state:"WV",chamber:"Senate"},
+  "Gary Peters":{party:"D",state:"MI",chamber:"Senate"},
+  "Nancy Pelosi":{party:"D",state:"CA",chamber:"House"},
+  "Dan Crenshaw":{party:"R",state:"TX",chamber:"House"},
+  "Ro Khanna":{party:"D",state:"CA",chamber:"House"},
+  "Marjorie Taylor Greene":{party:"R",state:"GA",chamber:"House"},
+  "Josh Gottheimer":{party:"D",state:"NJ",chamber:"House"},
+  "Michael McCaul":{party:"R",state:"TX",chamber:"House"},
+  "Kevin Hern":{party:"R",state:"OK",chamber:"House"},
+  "Virginia Foxx":{party:"R",state:"NC",chamber:"House"}
+};
+
+const COMMITTEES = [
+  {id:"sasc",name:"Senate Armed Services",chamber:"Senate",regulates:["Defense"],
+   members:["Tommy Tuberville","Rick Scott","Gary Peters"]},
+  {id:"sbnk",name:"Senate Banking & Housing",chamber:"Senate",regulates:["Financials"],
+   members:["Mark Warner","Tommy Tuberville"]},
+  {id:"scom",name:"Senate Commerce & Transportation",chamber:"Senate",regulates:["Technology","Telecom"],
+   members:["Rick Scott","Shelley Moore Capito","Gary Peters"]},
+  {id:"sfin",name:"Senate Finance",chamber:"Senate",regulates:["Healthcare","Financials"],
+   members:["Mark Warner","Ron Wyden","Sheldon Whitehouse"]},
+  {id:"sint",name:"Senate Intelligence",chamber:"Senate",regulates:["Technology","Defense"],
+   members:["Mark Warner","Ron Wyden"]},
+  {id:"henc",name:"House Energy & Commerce",chamber:"House",regulates:["Energy","Healthcare","Telecom"],
+   members:["Dan Crenshaw"]},
+  {id:"hfin",name:"House Financial Services",chamber:"House",regulates:["Financials"],
+   members:["Josh Gottheimer"]},
+  {id:"hasc",name:"House Armed Services",chamber:"House",regulates:["Defense"],
+   members:["Ro Khanna"]},
+  {id:"hwm",name:"House Ways & Means",chamber:"House",regulates:["Financials","Healthcare"],
+   members:["Kevin Hern"]}
+];
+
+const A = {
+  s:"$1,001 – $15,000", m:"$15,001 – $50,000", l:"$50,001 – $100,000",
+  xl:"$100,001 – $250,000", xxl:"$250,001 – $500,000",
+  xxxl:"$500,001 – $1,000,000", mega:"$1,000,001 – $5,000,000"
+};
+const AMID = {
+  [A.s]:8000,[A.m]:32500,[A.l]:75000,[A.xl]:175000,
+  [A.xxl]:375000,[A.xxxl]:750000,[A.mega]:3000000
+};
+
+/* member, ticker, type, amount, tradeDate, filingDate, source */
+const SAMPLE = [
+  ["t1","Tommy Tuberville","LMT","buy",A.l,"2026-06-10","2026-06-16","Senate"],
+  ["t2","Nancy Pelosi","NVDA","buy",A.mega,"2026-06-02","2026-06-12","Capitol Trades"],
+  ["t3","Mark Warner","NVDA","buy",A.xl,"2026-05-28","2026-06-09","Senate"],
+  ["t4","Dan Crenshaw","XOM","buy",A.m,"2026-05-20","2026-06-05","House"],
+  ["t5","Josh Gottheimer","GS","buy",A.l,"2026-05-15","2026-05-30","House"],
+  ["t6","Marjorie Taylor Greene","TSLA","buy",A.s,"2026-05-10","2026-05-26","House"],
+  ["t7","Rick Scott","NOC","buy",A.xxl,"2026-04-28","2026-05-20","Senate"],
+  ["t8","Nancy Pelosi","AAPL","buy",A.xxl,"2026-04-20","2026-05-02","Capitol Trades"],
+  ["t9","Shelley Moore Capito","T","buy",A.m,"2026-04-12","2026-04-30","Senate"],
+  ["t10","Ro Khanna","AAPL","buy",A.s,"2026-04-05","2026-04-22","House"],
+  ["t11","Ron Wyden","LLY","sell",A.l,"2026-03-25","2026-04-10","Senate"],
+  ["t12","Gary Peters","GD","buy",A.m,"2026-03-18","2026-04-02","Capitol Trades"],
+  ["t13","Kevin Hern","BAC","buy",A.l,"2026-03-10","2026-03-28","House"],
+  ["t14","Dan Crenshaw","CVX","buy",A.m,"2026-02-28","2026-03-16","House"],
+  ["t15","Mark Warner","PFE","sell",A.m,"2026-02-15","2026-03-01","Senate"],
+  ["t16","Marjorie Taylor Greene","DIS","buy",A.s,"2026-02-05","2026-02-22","Capitol Trades"],
+  ["t17","Josh Gottheimer","V","buy",A.m,"2026-01-28","2026-02-12","House"],
+  ["t18","Tommy Tuberville","RTX","buy",A.xl,"2026-01-15","2026-02-01","Senate"],
+  ["t19","Nancy Pelosi","GOOGL","buy",A.xxxl,"2026-01-08","2026-01-22","Capitol Trades"],
+  ["t20","Rick Scott","AAPL","buy",A.l,"2025-12-20","2026-01-06","Senate"],
+  ["t21","Sheldon Whitehouse","UNH","sell",A.m,"2025-12-10","2025-12-28","Senate"],
+  ["t22","Michael McCaul","MSFT","buy",A.l,"2025-11-25","2025-12-12","House"],
+  ["t23","Ron Wyden","MSFT","buy",A.m,"2025-11-12","2025-11-29","Senate"],
+  ["t24","Shelley Moore Capito","VZ","buy",A.s,"2025-10-30","2025-11-15","Senate"],
+  ["t25","Gary Peters","MSFT","buy",A.m,"2025-10-18","2025-11-03","Capitol Trades"],
+  ["t26","Dan Crenshaw","PFE","buy",A.s,"2025-10-05","2025-10-22","House"],
+  ["t27","Susan Collins","JNJ","buy",A.s,"2025-09-20","2025-10-08","Senate"],
+  ["t28","Kevin Hern","XOM","buy",A.m,"2025-09-08","2025-09-25","House"],
+  ["t29","Tommy Tuberville","AAPL","buy",A.m,"2025-08-22","2025-09-09","Senate"],
+  ["t30","Nancy Pelosi","TSLA","sell",A.xxl,"2025-08-10","2025-08-25","Capitol Trades"],
+  ["t31","Josh Gottheimer","AAPL","buy",A.s,"2025-07-15","2025-08-01","House"],
+  ["t32","Marjorie Taylor Greene","ABBV","buy",A.s,"2025-06-28","2025-07-14","House"],
+  ["t33","Mark Warner","JPM","buy",A.l,"2025-05-15","2025-06-01","Senate"],
+  ["t34","Virginia Foxx","SBUX","buy",A.s,"2025-03-12","2025-03-29","House"],
+  ["t35","Nancy Pelosi","AVGO","buy",A.xxxl,"2024-12-15","2024-12-30","Capitol Trades"],
+  ["t36","Rick Scott","NOC","buy",A.xl,"2024-09-20","2024-10-08","Senate"],
+  ["t37","Tommy Tuberville","GD","buy",A.l,"2024-07-10","2024-07-28","Senate"]
+].map(r => ({
+  id:r[0], member:r[1], ticker:r[2], type:r[3],
+  amount:r[4], tradeDate:r[5], filingDate:r[6], source:r[7]
+}));
+
+/* ============================================================
+   DERIVE / ENRICH
+============================================================ */
+function committeesFor(name){ return COMMITTEES.filter(c => c.members.includes(name)); }
+
+function tradeConflicts(member, sector){
+  if(!sector) return [];
+  return committeesFor(member).filter(c => c.regulates.includes(sector));
+}
+
+function enrich(t){
+  const m = MEMBERS[t.member] || {};
+  const tk = TICKERS[t.ticker] || {};
+  const sector = t.sector || tk.s || "Other";
+  const conflicts = tradeConflicts(t.member, sector);
+  return {
+    ...t,
+    party: t.party || m.party || "I",
+    state: t.state || m.state || "—",
+    chamber: t.chamber || m.chamber || (t.source === "House" ? "House" : "Senate"),
+    company: t.company || tk.n || t.ticker,
+    sector,
+    est: AMID[t.amount] || 0,
+    conflicts,
+    isConflict: conflicts.length > 0
+  };
+}
+
+function ageLabel(iso){
+  const d = new Date(iso + "T00:00:00");
+  const now = new Date();
+  const ms = now - d;
+  if(ms < 0) return "today";
+  const days = Math.floor(ms / 86400000);
+  if(days <= 0) return "today";
+  if(days < 7)  return days + "d ago";
+  if(days < 56) return Math.floor(days/7) + "w ago";
+  let years = now.getFullYear() - d.getFullYear();
+  let months = now.getMonth() - d.getMonth();
+  if(now.getDate() < d.getDate()) months--;
+  if(months < 0){ years--; months += 12; }
+  if(years < 1){ return Math.max(1, years*12 + months) + "mo ago"; }
+  return months > 0 ? (years + "y " + months + "mo ago") : (years + "y ago");
+}
+function timeAgoShort(d){
+  if(!d) return "just now";
+  const s = Math.floor((Date.now() - d.getTime())/1000);
+  if(s < 45) return "just now";
+  if(s < 3600) return Math.floor(s/60) + "m ago";
+  if(s < 86400) return Math.floor(s/3600) + "h ago";
+  return Math.floor(s/86400) + "d ago";
+}
+function lagDays(t){
+  return Math.max(0, Math.round((new Date(t.filingDate) - new Date(t.tradeDate)) / 86400000));
+}
+function fmtDate(iso){
+  try{ return new Date(iso+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
+  catch(e){ return iso; }
+}
+function abbrUSD(n){
+  if(n >= 1e6) return "$" + (n/1e6).toFixed(n>=1e7?0:1) + "M";
+  if(n >= 1e3) return "$" + Math.round(n/1e3) + "K";
+  return "$" + n;
+}
+
+/* normalize unknown live payloads defensively */
+function pick(o, keys){ for(const k of keys){ if(o[k]!=null && o[k]!=="") return o[k]; } return undefined; }
+function normalizeLive(json, sourceName){
+  const arr = Array.isArray(json) ? json : (json && (json.data || json.trades || json.results)) || [];
+  if(!Array.isArray(arr)) return [];
+  const out = [];
+  arr.forEach((raw, i) => {
+    try{
+      if(!raw || typeof raw !== "object") return;
+      const member = pick(raw,["member","representative","senator","name","politician","full_name"]);
+      const ticker = pick(raw,["ticker","symbol","asset","ticker_symbol"]);
+      if(!member || !ticker) return;
+      const rawType = (pick(raw,["type","transaction","transaction_type","action","txType"]) || "").toString().toLowerCase();
+      const type = /sell|sale|sold|divest/.test(rawType) ? "sell" : "buy";
+      const tradeDate = pick(raw,["trade_date","tradeDate","transaction_date","traded","date","transactionDate"]);
+      const filingDate = pick(raw,["filing_date","filingDate","disclosure_date","filed","reportDate","disclosureDate"]) || tradeDate;
+      out.push(enrich({
+        id: "live-" + sourceName + "-" + (pick(raw,["id","_id"]) || i),
+        member: String(member),
+        ticker: String(ticker).toUpperCase().slice(0,6),
+        type,
+        amount: pick(raw,["amount","range","value","amount_range"]) || A.s,
+        tradeDate: (tradeDate || "").slice(0,10),
+        filingDate: (filingDate || "").slice(0,10),
+        source: sourceName,
+        party: pick(raw,["party"]),
+        state: pick(raw,["state"]),
+        chamber: pick(raw,["chamber"]),
+        company: pick(raw,["company"]),
+        sector: pick(raw,["sector"])
+      }));
+    }catch(e){ /* skip bad row */ }
+  });
+  return out.filter(t => t.tradeDate && /^\d{4}-\d{2}-\d{2}$/.test(t.tradeDate));
+}
+function sig(t){ return [t.member,t.ticker,t.tradeDate,t.type].join("|").toLowerCase(); }
+
+/* Fetch one source's rows from Supabase (PostgREST). Throws on non-2xx so the
+   caller can mark that source's status dot red and fall back to sample data. */
+async function fetchTradesBySource(source){
+  const url = SUPABASE_URL + "/rest/v1/" + TRADES_TABLE +
+    "?select=*&source=eq." + encodeURIComponent(source) +
+    "&order=trade_date.desc";
+  const ctrl = new AbortController();
+  const to = setTimeout(()=>ctrl.abort(), 7000);
+  try{
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: "Bearer " + SUPABASE_KEY,
+        accept: "application/json"
+      }
+    });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } finally { clearTimeout(to); }
+}
+
+/* ============================================================
+   ICONS
+============================================================ */
+const I = {
+  feed:(p)=> <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>,
+  members:(p)=> <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M16 6.2a3 3 0 0 1 0 5.6"/><path d="M18 19a5 5 0 0 0-2.6-4.4"/></svg>,
+  committees:(p)=> <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M3 21h18"/><path d="M12 3 3 8h18Z"/><line x1="5" y1="10" x2="5" y2="18"/><line x1="9.5" y1="10" x2="9.5" y2="18"/><line x1="14.5" y1="10" x2="14.5" y2="18"/><line x1="19" y1="10" x2="19" y2="18"/></svg>,
+  trends:(p)=> <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M4 18 10 12l4 3 6-7"/><path d="M20 8h-4"/><path d="M20 8v4"/></svg>,
+  watch:(p)=> <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="m12 3 2.6 5.5 6 .8-4.4 4.2 1.1 6L12 16.8 6.7 19.5l1.1-6L3.4 9.3l6-.8Z"/></svg>,
+  search:(p)=> <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>,
+  chev:(p)=> <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="9 6 15 12 9 18"/></svg>,
+  back:(p)=> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="15 6 9 12 15 18"/></svg>,
+  spark:(p)=> <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M12 2l1.6 6.4L20 10l-6.4 1.6L12 18l-1.6-6.4L4 10l6.4-1.6z"/></svg>,
+  flag:(p)=> <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
+};
+
+/* ============================================================
+   AI PANEL (reusable)
+============================================================ */
+function AIPanel({ title, desc, autoPrompt, context }){
+  const [out, setOut] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [q, setQ] = useState("");
+
+  async function run(prompt){
+    setLoading(true); setErr(""); setOut("");
+    try{
+      const text = await askClaude(prompt);
+      setOut(text);
+    }catch(e){
+      setErr("Live AI analysis isn't reachable in this preview — it connects automatically when the app runs with the Anthropic API. (" + (e.message||"offline") + ")");
+    }finally{
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="ai">
+      <div className="ai-h">
+        <span className="spark">{I.spark()}</span>
+        <span className="ai-title">{title}</span>
+      </div>
+      <p className="ai-desc">{desc}</p>
+      <button className="ai-btn" disabled={loading} onClick={()=>run(autoPrompt)}>
+        {loading ? <span className="ai-spin"></span> : I.spark()}
+        {loading ? "Analyzing…" : "Analyze"}
+      </button>
+
+      <div className="ai-ask">
+        <input
+          value={q}
+          placeholder="Ask a question about this data…"
+          onChange={e=>setQ(e.target.value)}
+          onKeyDown={e=>{ if(e.key==="Enter" && q.trim() && !loading){ run("Question: " + q.trim() + "\n\nData context:\n" + context); } }}
+        />
+        <button onClick={()=>{ if(q.trim() && !loading) run("Question: " + q.trim() + "\n\nData context:\n" + context); }}>Ask</button>
+      </div>
+
+      {loading && <div className="ai-loading"><span className="d"></span> Consulting Claude…</div>}
+      {err && <div className="ai-err">{err}</div>}
+      {out && <div className="ai-out">{out.split(/\n{2,}/).map((p,i)=><p key={i}>{p}</p>)}</div>}
+    </div>
+  );
+}
+
+/* ============================================================
+   TRADE CARD + DETAIL SHEET
+============================================================ */
+function TradeCard({ t, onOpen }){
+  const ref = useRef(null);
+  const start = useRef(0);
+  const [dx, setDx] = useState(0);
+
+  function onStart(e){ start.current = e.touches ? e.touches[0].clientX : e.clientX; }
+  function onMove(e){
+    if(!start.current) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const delta = x - start.current;
+    if(Math.abs(delta) > 4) setDx(Math.max(-60, Math.min(60, delta)));
+  }
+  function onEnd(){ start.current = 0; setDx(0); }
+
+  return (
+    <button
+      ref={ref}
+      className={"tcard" + (dx ? " swiped" : "")}
+      style={{ transform: dx ? "translateX(" + dx*0.4 + "px)" : "" }}
+      onClick={()=>onOpen(t)}
+      onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
+    >
+      <span className={"tcard-side " + t.type}></span>
+      <span className="tcard-body">
+        <span className="tcard-top">
+          <span className={"pill " + t.type}>{t.type}</span>
+          <span className="member-name">{t.member}</span>
+          <span className={"party " + t.party}>{t.party}</span>
+          <span className="src-tag">{t.state}</span>
+        </span>
+        <span className="tcard-tick">
+          <span className="ticker">{t.ticker}</span>
+          <span className="company">{t.company}</span>
+        </span>
+        <span className="tcard-meta">
+          <span className="amount">{t.amount}</span>
+          <span className="sector-tag">{t.sector}</span>
+        </span>
+      </span>
+      <span className="tcard-right">
+        <span className="age">{ageLabel(t.tradeDate)}</span>
+        {t.isConflict && <span className="flag">{I.flag()} conflict</span>}
+        <span className="src-tag">{t.source}</span>
+      </span>
+    </button>
+  );
+}
+
+function DetailSheet({ t, onClose, onMember }){
+  useEffect(()=>{
+    function esc(e){ if(e.key==="Escape") onClose(); }
+    window.addEventListener("keydown", esc);
+    return ()=>window.removeEventListener("keydown", esc);
+  },[]);
+  if(!t) return null;
+  const lag = lagDays(t);
+  return (
+    <>
+      <div className="overlay" onClick={onClose}></div>
+      <div className="sheet" role="dialog" aria-modal="true">
+        <div className="sheet-grab"></div>
+        <button className="sheet-x" onClick={onClose} aria-label="Close">✕</button>
+        <div className="sheet-inner">
+          <div className="detail-head">
+            <span className={"pill " + t.type}>{t.type}</span>
+            <span className="detail-ticker mono">{t.ticker}</span>
+          </div>
+          <div className="detail-company">{t.company} · {t.sector}</div>
+
+          <div className="kv">
+            <span className="kv-k">Member</span>
+            <button className="linklike" onClick={()=>{ onClose(); onMember(t.member); }}>{t.member}</button>
+          </div>
+          <div className="kv"><span className="kv-k">Party · State</span><span className="kv-v">{t.party} · {t.state} · {t.chamber}</span></div>
+          <div className="kv"><span className="kv-k">Transaction</span><span className="kv-v" style={{color:t.type==="buy"?"var(--buy)":"var(--sell)"}}>{t.type==="buy"?"Purchase":"Sale"}</span></div>
+          <div className="kv"><span className="kv-k">Amount</span><span className="kv-v mono">{t.amount}</span></div>
+          <div className="kv"><span className="kv-k">Trade date</span><span className="kv-v">{fmtDate(t.tradeDate)}</span></div>
+          <div className="kv"><span className="kv-k">Age</span><span className="kv-v">{ageLabel(t.tradeDate)}</span></div>
+          <div className="kv"><span className="kv-k">Source</span><span className="kv-v">{t.source}</span></div>
+
+          {t.isConflict && (
+            <div className="conflict-box">
+              <div className="ct">{I.flag()} Potential conflict of interest</div>
+              <div className="cd">
+                {t.member} sits on {t.conflicts.map(c=>c.name).join(" and ")}, which {t.conflicts.length>1?"regulate":"regulates"} the <b>{t.sector}</b> sector — the same sector as this {t.type==="buy"?"purchase":"sale"} of {t.company}.
+              </div>
+            </div>
+          )}
+
+          <div className="lag-note">
+            <b>Disclosure lag:</b> filed {fmtDate(t.filingDate)} — <b>{lag} day{lag===1?"":"s"}</b> after the trade.
+            {lag>45 ? " Exceeds the 45-day STOCK Act window." : " Within the 45-day STOCK Act window."}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ============================================================
+   FEED
+============================================================ */
+function Feed({ trades, onOpen }){
+  const [chamber, setChamber] = useState("All");
+  const [source, setSource] = useState("All");
+  const [side, setSide] = useState("All");
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(()=>{
+    const q = query.trim().toLowerCase();
+    return trades.filter(t=>{
+      if(chamber!=="All" && t.chamber!==chamber) return false;
+      if(source!=="All" && t.source!==source) return false;
+      if(side!=="All" && t.type!==side) return false;
+      if(q){
+        const hay = (t.member+" "+t.ticker+" "+t.company+" "+t.sector+" "+t.state).toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  },[trades,chamber,source,side,query]);
+
+  const ctx = filtered.slice(0,30).map(t=>`${t.member} (${t.party}-${t.state}) ${t.type} ${t.ticker}/${t.sector} ${t.amount} on ${t.tradeDate}${t.isConflict?" [CONFLICT]":""}`).join("\n");
+
+  return (
+    <div className="view">
+      <p className="eyebrow">The Feed</p>
+      <h2 className="section-title">Latest disclosures</h2>
+      <p className="section-note">Congressional stock transactions across the Senate and House, newest trade first.</p>
+
+      <div className="searchbar">
+        {I.search()}
+        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search member, ticker, sector…" />
+      </div>
+
+      <div className="filters">
+        <span className="filter-label">Chamber</span>
+        {["All","Senate","House"].map(c=>
+          <button key={c} className={"chip"+(chamber===c?" on":"")} onClick={()=>setChamber(c)}>{c}</button>)}
+      </div>
+      <div className="filters">
+        <span className="filter-label">Source</span>
+        {["All","Senate","House","Capitol Trades"].map(s=>
+          <button key={s} className={"chip"+(source===s?" on":"")} onClick={()=>setSource(s)}>{s}</button>)}
+      </div>
+      <div className="filters">
+        <span className="filter-label">Side</span>
+        {["All","buy","sell"].map(s=>
+          <button key={s} className={"chip"+(side===s?(" on "+s):"")} onClick={()=>setSide(s)}>{s==="All"?"All":s[0].toUpperCase()+s.slice(1)}</button>)}
+      </div>
+
+      <div className="result-count">{filtered.length} trade{filtered.length===1?"":"s"}{filtered.filter(t=>t.isConflict).length>0 && " · "+filtered.filter(t=>t.isConflict).length+" flagged"}</div>
+
+      <AIPanel
+        title="Feed analysis"
+        desc="Let Claude surface patterns, clustered buys, and conflicts in the trades currently shown."
+        autoPrompt={"Analyze these congressional trades. Identify the 3-4 most notable patterns — clustered buying/selling, sectors in focus, and any potential committee conflicts. Keep it under 180 words.\n\nTRADES:\n"+ctx}
+        context={ctx}
+      />
+
+      <div className="stack">
+        {filtered.length===0
+          ? <div className="empty"><span className="big">⌀</span>No trades match these filters.</div>
+          : filtered.map(t=> <TradeCard key={t.id} t={t} onOpen={onOpen} />)}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   MEMBERS
+============================================================ */
+function MembersList({ index, watch, toggleWatch, onPick }){
+  const [q,setQ] = useState("");
+  const list = useMemo(()=>{
+    const arr = Object.values(index).sort((a,b)=> b.trades.length - a.trades.length);
+    const s = q.trim().toLowerCase();
+    return s ? arr.filter(m=> (m.name+" "+m.state+" "+m.party).toLowerCase().includes(s)) : arr;
+  },[index,q]);
+
+  return (
+    <div className="view">
+      <p className="eyebrow">Members</p>
+      <h2 className="section-title">Who's trading</h2>
+      <p className="section-note">Every member with disclosed transactions. Tap ☆ to add to your watchlist.</p>
+
+      <div className="searchbar">{I.search()}
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search members…" />
+      </div>
+
+      <div className="stack">
+        {list.map(m=>(
+          <div key={m.name} className="row" role="button" onClick={()=>onPick(m.name)}>
+            <button className={"star"+(watch.includes(m.name)?" on":"")} onClick={e=>{e.stopPropagation();toggleWatch(m.name);}} aria-label="Toggle watch">
+              {watch.includes(m.name) ? "★" : "☆"}
+            </button>
+            <div className="row-main">
+              <div className="row-name">{m.name} <span className={"party "+m.party}>{m.party}</span></div>
+              <div className="row-sub">
+                <span>{m.state} · {m.chamber}</span>
+                {m.conflictCount>0 && <span className="conf">⚑ {m.conflictCount} conflict{m.conflictCount===1?"":"s"}</span>}
+              </div>
+            </div>
+            <div className="mini-stat"><span className="n">{m.trades.length}</span><span className="l">trades</span></div>
+            <span className="chev">{I.chev()}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MemberProfile({ name, index, watch, toggleWatch, onOpen, onBack }){
+  const m = index[name];
+  if(!m) return <div className="view"><button className="back" onClick={onBack}>{I.back()} Back</button><div className="empty">Member not found.</div></div>;
+  const comms = committeesFor(name);
+  const conflicts = m.trades.filter(t=>t.isConflict);
+
+  const ctx =
+    `Member: ${name} (${m.party}-${m.state}, ${m.chamber})\n`+
+    `Committees: ${comms.map(c=>c.name+" [regulates "+c.regulates.join(", ")+"]").join("; ")||"none on file"}\n`+
+    `Trades (${m.trades.length}):\n`+
+    m.trades.map(t=>`- ${t.type} ${t.ticker}/${t.sector} ${t.amount} on ${t.tradeDate}${t.isConflict?" [POTENTIAL CONFLICT: "+t.conflicts.map(c=>c.name).join(",")+"]":""}`).join("\n");
+
+  return (
+    <div className="view">
+      <button className="back" onClick={onBack}>{I.back()} All members</button>
+
+      <div className="profile-head">
+        <div>
+          <h2 className="profile-name">{name}</h2>
+          <div className="profile-meta">
+            <span className={"party "+m.party}>{m.party}</span>
+            <span>{m.state}</span><span>·</span><span>{m.chamber}</span>
+          </div>
+        </div>
+        <button className={"star"+(watch.includes(name)?" on":"")} onClick={()=>toggleWatch(name)} style={{fontSize:"26px"}}>
+          {watch.includes(name)?"★":"☆"}
+        </button>
+      </div>
+
+      <div className="stat-grid" style={{marginTop:14}}>
+        <div className="stat-box"><div className="n">{m.trades.length}</div><div className="l">Trades</div></div>
+        <div className="stat-box"><div className="n" style={{color:conflicts.length?"var(--sell)":"inherit"}}>{conflicts.length}</div><div className="l">Conflicts</div></div>
+        <div className="stat-box"><div className="n">{abbrUSD(m.volume)}</div><div className="l">Est. volume</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-h">Committee memberships <span className="cnt">{comms.length}</span></div>
+        {comms.length===0
+          ? <div className="comm-reg">No committee assignments on file in this dataset.</div>
+          : comms.map(c=>(
+              <div key={c.id} className="comm-item">
+                <div className="comm-name">{c.name}</div>
+                <div className="comm-reg">Regulates:
+                  {c.regulates.map(r=><span key={r} className="reg-tag">{r}</span>)}
+                </div>
+              </div>
+          ))}
+      </div>
+
+      <div className="card">
+        <div className="card-h">Potential conflicts <span className="cnt">{conflicts.length}</span></div>
+        {conflicts.length===0
+          ? <div className="comm-reg">No trades overlap this member's committee jurisdictions. ✓</div>
+          : conflicts.map(t=>(
+              <div key={t.id} className="conf-line">
+                <b>{t.type==="buy"?"Bought":"Sold"} {t.ticker}</b> ({t.sector}) — overlaps {t.conflicts.map(c=>c.name).join(", ")}. <span className="mono">{t.amount}</span>, {ageLabel(t.tradeDate)}.
+              </div>
+          ))}
+      </div>
+
+      <AIPanel
+        title="AI member analysis"
+        desc={"Claude reviews "+name+"'s trading against their committee assignments."}
+        autoPrompt={"Give a concise, neutral analysis of this member's trading behaviour and any potential conflicts of interest with their committee jurisdictions. Under 180 words.\n\n"+ctx}
+        context={ctx}
+      />
+
+      <div className="card-h" style={{margin:"4px 0 11px"}}>Trade history <span className="cnt">{m.trades.length}</span></div>
+      <div className="stack">
+        {m.trades.map(t=> <TradeCard key={t.id} t={t} onOpen={onOpen} />)}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   COMMITTEES
+============================================================ */
+function CommitteesList({ trades, onPick }){
+  const counts = useMemo(()=>{
+    const map = {};
+    COMMITTEES.forEach(c=>{
+      const memberTrades = trades.filter(t=>c.members.includes(t.member));
+      const conflicts = memberTrades.filter(t=> c.regulates.includes(t.sector));
+      map[c.id] = { trades: memberTrades.length, conflicts: conflicts.length };
+    });
+    return map;
+  },[trades]);
+
+  return (
+    <div className="view">
+      <p className="eyebrow">Committees</p>
+      <h2 className="section-title">Jurisdiction & overlap</h2>
+      <p className="section-note">Each committee regulates sectors. Trades by its members in those sectors are flagged as potential conflicts.</p>
+      <div className="stack">
+        {COMMITTEES.map(c=>(
+          <div key={c.id} className="row" role="button" onClick={()=>onPick(c.id)}>
+            <div className="row-main">
+              <div className="row-name">{c.name}</div>
+              <div className="row-sub">
+                <span>{c.chamber} · {c.members.length} members</span>
+                {counts[c.id].conflicts>0 && <span className="conf">⚑ {counts[c.id].conflicts} conflict{counts[c.id].conflicts===1?"":"s"}</span>}
+              </div>
+              <div style={{marginTop:6}}>
+                {c.regulates.map(r=><span key={r} className="reg-tag">{r}</span>)}
+              </div>
+            </div>
+            <span className="chev">{I.chev()}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CommitteeDetail({ id, index, trades, onOpenMember, onOpen, onBack }){
+  const c = COMMITTEES.find(x=>x.id===id);
+  if(!c) return <div className="view"><button className="back" onClick={onBack}>{I.back()} Back</button><div className="empty">Committee not found.</div></div>;
+  const memberTrades = trades.filter(t=>c.members.includes(t.member));
+  const conflicts = memberTrades.filter(t=> c.regulates.includes(t.sector));
+
+  const ctx =
+    `Committee: ${c.name} (${c.chamber})\nRegulates: ${c.regulates.join(", ")}\nMembers: ${c.members.join(", ")}\n`+
+    `Flagged conflict trades (${conflicts.length}):\n`+
+    (conflicts.map(t=>`- ${t.member}: ${t.type} ${t.ticker}/${t.sector} ${t.amount} on ${t.tradeDate}`).join("\n")||"none");
+
+  return (
+    <div className="view">
+      <button className="back" onClick={onBack}>{I.back()} All committees</button>
+      <h2 className="profile-name" style={{marginTop:4}}>{c.name}</h2>
+      <div className="profile-meta"><span className="badge">{c.chamber}</span>
+        {c.regulates.map(r=><span key={r} className="reg-tag" style={{marginTop:0}}>{r}</span>)}
+      </div>
+
+      <div className="stat-grid" style={{marginTop:16}}>
+        <div className="stat-box"><div className="n">{c.members.length}</div><div className="l">Members</div></div>
+        <div className="stat-box"><div className="n">{memberTrades.length}</div><div className="l">Trades</div></div>
+        <div className="stat-box"><div className="n" style={{color:conflicts.length?"var(--sell)":"inherit"}}>{conflicts.length}</div><div className="l">Conflicts</div></div>
+      </div>
+
+      <div className="card">
+        <div className="card-h">Members <span className="cnt">{c.members.length}</span></div>
+        {c.members.map(name=>{
+          const m = index[name];
+          return (
+            <div key={name} className="comm-item" style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>onOpenMember(name)}>
+              <div style={{flex:1}}>
+                <div className="comm-name">{name} {m && <span className={"party "+m.party}>{m.party}</span>}</div>
+                <div className="comm-reg">{m? m.state+" · "+m.trades.length+" trades" : "—"}</div>
+              </div>
+              <span className="chev">{I.chev()}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <AIPanel
+        title="AI committee analysis"
+        desc={"Claude examines trades by "+c.name+" members inside its regulated sectors."}
+        autoPrompt={"Analyze potential conflicts of interest for this committee: are members trading in sectors the committee oversees? Be specific and neutral, under 180 words.\n\n"+ctx}
+        context={ctx}
+      />
+
+      <div className="card-h" style={{margin:"4px 0 11px"}}>Flagged conflict trades <span className="cnt">{conflicts.length}</span></div>
+      <div className="stack" style={{marginBottom:16}}>
+        {conflicts.length===0
+          ? <div className="empty">No member trades fall inside this committee's regulated sectors.</div>
+          : conflicts.map(t=> <TradeCard key={t.id} t={t} onOpen={onOpen} />)}
+      </div>
+
+      <div className="card-h" style={{margin:"4px 0 11px"}}>All member trades <span className="cnt">{memberTrades.length}</span></div>
+      <div className="stack">
+        {memberTrades.map(t=> <TradeCard key={t.id} t={t} onOpen={onOpen} />)}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   TRENDS
+============================================================ */
+function Trends({ trades }){
+  const stats = useMemo(()=>{
+    const byTicker={}, bySector={}, byParty={D:{n:0,v:0},R:{n:0,v:0},I:{n:0,v:0}};
+    trades.forEach(t=>{
+      (byTicker[t.ticker] = byTicker[t.ticker] || {ticker:t.ticker,company:t.company,sector:t.sector,n:0,v:0}).n++;
+      byTicker[t.ticker].v += t.est;
+      (bySector[t.sector] = bySector[t.sector] || {sector:t.sector,n:0,v:0}).n++;
+      bySector[t.sector].v += t.est;
+      const p = byParty[t.party] ? t.party : "I";
+      byParty[p].n++; byParty[p].v += t.est;
+    });
+    const tickers = Object.values(byTicker).sort((a,b)=>b.n-a.n).slice(0,8);
+    const sectors = Object.values(bySector).sort((a,b)=>b.v-a.v);
+    const buys = trades.filter(t=>t.type==="buy").sort((a,b)=>b.est-a.est).slice(0,5);
+    const sells = trades.filter(t=>t.type==="sell").sort((a,b)=>b.est-a.est).slice(0,5);
+    return { tickers, sectors, buys, sells, byParty, total:trades.length,
+             conflicts: trades.filter(t=>t.isConflict).length,
+             volume: trades.reduce((s,t)=>s+t.est,0) };
+  },[trades]);
+
+  const maxTick = Math.max(1, ...stats.tickers.map(t=>t.n));
+  const maxSec = Math.max(1, ...stats.sectors.map(s=>s.v));
+  const pv = stats.byParty.D.v + stats.byParty.R.v || 1;
+  const dPct = Math.round(stats.byParty.D.v/pv*100);
+
+  const ctx =
+    `Total trades: ${stats.total}, flagged conflicts: ${stats.conflicts}, est volume: ${abbrUSD(stats.volume)}\n`+
+    `Most traded: ${stats.tickers.map(t=>t.ticker+"("+t.n+")").join(", ")}\n`+
+    `Sector volume: ${stats.sectors.map(s=>s.sector+" "+abbrUSD(s.v)).join(", ")}\n`+
+    `Party split by volume: D ${dPct}% / R ${100-dPct}%\n`+
+    `Top buys: ${stats.buys.map(t=>t.member+" "+t.ticker).join(", ")}\n`+
+    `Top sells: ${stats.sells.map(t=>t.member+" "+t.ticker).join(", ")}`;
+
+  return (
+    <div className="view">
+      <p className="eyebrow">Trends</p>
+      <h2 className="section-title">The money map</h2>
+      <p className="section-note">Aggregate signal across every disclosed trade in the dataset.</p>
+
+      <div className="stat-grid">
+        <div className="stat-box"><div className="n">{stats.total}</div><div className="l">Trades</div></div>
+        <div className="stat-box"><div className="n">{abbrUSD(stats.volume)}</div><div className="l">Est. volume</div></div>
+        <div className="stat-box"><div className="n" style={{color:"var(--sell)"}}>{stats.conflicts}</div><div className="l">Conflicts</div></div>
+      </div>
+
+      <AIPanel
+        title="Congress-wide AI analysis"
+        desc="Claude reads the aggregate trends and reports the headline story."
+        autoPrompt={"You are looking at aggregate congressional trading stats. Write a sharp, neutral 'state of the tape' briefing: what sectors and names dominate, notable party patterns, and where the conflict risk concentrates. Under 200 words.\n\n"+ctx}
+        context={ctx}
+      />
+
+      <div className="card">
+        <div className="card-h">Most traded tickers</div>
+        {stats.tickers.map(t=>(
+          <div key={t.ticker} className="bar-row">
+            <div className="bar-top">
+              <span className="bar-label"><span className="tk">{t.ticker}</span> <span style={{color:"var(--muted)",fontWeight:400,fontSize:12}}>{t.company}</span></span>
+              <span className="bar-val">{t.n}×</span>
+            </div>
+            <div className="bar-track"><div className="bar-fill" style={{width:(t.n/maxTick*100)+"%",background:"var(--accent)"}}></div></div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="card-h">Sector activity <span className="cnt">by est. volume</span></div>
+        {stats.sectors.map(s=>(
+          <div key={s.sector} className="bar-row">
+            <div className="bar-top">
+              <span className="bar-label">{s.sector}</span>
+              <span className="bar-val">{abbrUSD(s.v)} · {s.n}×</span>
+            </div>
+            <div className="bar-track"><div className="bar-fill" style={{width:(s.v/maxSec*100)+"%",background:"var(--ink)"}}></div></div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="card-h">Party split <span className="cnt">by est. volume</span></div>
+        <div className="party-split">
+          <div className="d" style={{width:dPct+"%"}}>{dPct>12?("D "+dPct+"%"):""}</div>
+          <div className="r" style={{width:(100-dPct)+"%"}}>{(100-dPct)>12?("R "+(100-dPct)+"%"):""}</div>
+        </div>
+        <div className="row-sub" style={{justifyContent:"space-between"}}>
+          <span>Democrats · {stats.byParty.D.n} trades · {abbrUSD(stats.byParty.D.v)}</span>
+          <span>Republicans · {stats.byParty.R.n} trades · {abbrUSD(stats.byParty.R.v)}</span>
+        </div>
+      </div>
+
+      <div className="twocol">
+        <div className="card" style={{marginBottom:0}}>
+          <div className="card-h" style={{fontSize:14,color:"var(--buy)"}}>Top buys</div>
+          {stats.buys.map((t,i)=>(
+            <div key={t.id} className="leader">
+              <span className="rk">{i+1}</span>
+              <span><span className="tk">{t.ticker}</span><br/><span className="who">{t.member}</span></span>
+              <span className="amt">{abbrUSD(t.est)}</span>
+            </div>
+          ))}
+        </div>
+        <div className="card" style={{marginBottom:0}}>
+          <div className="card-h" style={{fontSize:14,color:"var(--sell)"}}>Top sells</div>
+          {stats.sells.length===0 ? <div className="comm-reg">No sells in dataset.</div> :
+            stats.sells.map((t,i)=>(
+            <div key={t.id} className="leader">
+              <span className="rk">{i+1}</span>
+              <span><span className="tk">{t.ticker}</span><br/><span className="who">{t.member}</span></span>
+              <span className="amt">{abbrUSD(t.est)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   WATCHLIST
+============================================================ */
+function Watchlist({ watch, index, toggleWatch, onPick, onOpen }){
+  const watched = watch.map(n=>index[n]).filter(Boolean);
+  const watchedTrades = useMemo(()=>{
+    const set = new Set(watch);
+    return trades_sortRecent(Object.values(index).flatMap(m=>m.trades).filter(t=>set.has(t.member)));
+  },[watch,index]);
+
+  const ctx = watched.length
+    ? watched.map(m=>`${m.name} (${m.party}-${m.state}): ${m.trades.length} trades, ${m.conflictCount} conflicts. Recent: ${m.trades.slice(0,3).map(t=>t.type+" "+t.ticker).join(", ")}`).join("\n")
+    : "Watchlist is empty.";
+
+  return (
+    <div className="view">
+      <p className="eyebrow">Watchlist</p>
+      <h2 className="section-title">Your watch</h2>
+      <p className="section-note">Saved members, kept across sessions. Tap ☆ on any member to follow them.</p>
+
+      {watched.length===0
+        ? <div className="empty"><span className="big">☆</span>Nothing watched yet.<br/>Open <b>Members</b> and tap the star to start tracking someone.</div>
+        : <>
+            <div className="stack" style={{marginBottom:16}}>
+              {watched.map(m=>(
+                <div key={m.name} className="row" role="button" onClick={()=>onPick(m.name)}>
+                  <button className="star on" onClick={e=>{e.stopPropagation();toggleWatch(m.name);}}>★</button>
+                  <div className="row-main">
+                    <div className="row-name">{m.name} <span className={"party "+m.party}>{m.party}</span></div>
+                    <div className="row-sub">
+                      <span>{m.state} · {m.chamber} · {m.trades.length} trades</span>
+                      {m.conflictCount>0 && <span className="conf">⚑ {m.conflictCount}</span>}
+                    </div>
+                  </div>
+                  <span className="chev">{I.chev()}</span>
+                </div>
+              ))}
+            </div>
+
+            <AIPanel
+              title="AI watchlist briefing"
+              desc="Claude summarizes what the members you follow have been doing."
+              autoPrompt={"Summarize recent trading activity and conflict risk for this watchlist of members. Lead with the most newsworthy item. Under 170 words.\n\n"+ctx}
+              context={ctx}
+            />
+
+            <div className="card-h" style={{margin:"4px 0 11px"}}>Recent activity <span className="cnt">{watchedTrades.length}</span></div>
+            <div className="stack">
+              {watchedTrades.map(t=> <TradeCard key={t.id} t={t} onOpen={onOpen} />)}
+            </div>
+          </>
+      }
+    </div>
+  );
+}
+
+function trades_sortRecent(arr){
+  return [...arr].sort((a,b)=> new Date(b.tradeDate) - new Date(a.tradeDate));
+}
+
+/* ============================================================
+   ROOT APP
+============================================================ */
+function App(){
+  const [view, setView] = useState("feed");
+  const [live, setLive] = useState([]);
+  const [liveOk, setLiveOk] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [, setTick] = useState(0);
+  const [status, setStatus] = useState({senate:"loading",house:"loading",capitol:"loading"});
+  const [watch, setWatch] = useState([]);
+  const [detail, setDetail] = useState(null);
+  const [memberView, setMemberView] = useState(null);
+  const [committeeView, setCommitteeView] = useState(null);
+
+  /* load watchlist */
+  useEffect(()=>{ (async()=>{
+    const raw = await store.get(WATCH_KEY);
+    if(raw){ try{ const arr = JSON.parse(raw); if(Array.isArray(arr)) setWatch(arr); }catch(e){} }
+  })(); },[]);
+  /* persist watchlist */
+  useEffect(()=>{ store.set(WATCH_KEY, JSON.stringify(watch)); },[watch]);
+
+  /* live fetch from Supabase, one query per source; fresh snapshot each call */
+  const loadLive = useCallback(async ()=>{
+    setRefreshing(true);
+    const tasks = [["senate","Senate"],["house","House"],["capitol","Capitol Trades"]];
+    const collected = [];
+    let any = false;
+    await Promise.all(tasks.map(async ([key,source])=>{
+      try{
+        const norm = normalizeLive(await fetchTradesBySource(source), source);
+        setStatus(s=>({...s,[key]:"live"}));
+        if(norm.length){ collected.push(...norm); any = true; }
+      }catch(e){
+        setStatus(s=>({...s,[key]:"error"}));
+      }
+    }));
+    if(any){ setLive(collected); setLiveOk(true); }   // replace (not append) — keeps last-good on total failure
+    setLastUpdated(new Date());
+    setRefreshing(false);
+  },[]);
+
+  /* fetch on mount, auto-refresh every 5 min, and when the tab regains focus */
+  useEffect(()=>{
+    loadLive();
+    const poll = setInterval(loadLive, 5*60*1000);
+    const onFocus = ()=>loadLive();
+    window.addEventListener("focus", onFocus);
+    return ()=>{ clearInterval(poll); window.removeEventListener("focus", onFocus); };
+  },[loadLive]);
+
+  /* tick every 30s so the "updated Xm ago" label stays current */
+  useEffect(()=>{
+    const id = setInterval(()=>setTick(t=>t+1), 30000);
+    return ()=>clearInterval(id);
+  },[]);
+
+  /* dataset = live Supabase rows when present, otherwise the offline sample.
+     Dedupe by signature so any duplicate rows in the table never double-render. */
+  const trades = useMemo(()=>{
+    const source = (liveOk && live.length) ? live : SAMPLE.map(enrich);
+    const seen = new Set();
+    const uniq = [];
+    for(const t of source){
+      const s = sig(t);
+      if(!seen.has(s)){ seen.add(s); uniq.push(t); }
+    }
+    return trades_sortRecent(uniq);
+  },[live,liveOk]);
+
+  /* member index */
+  const index = useMemo(()=>{
+    const idx = {};
+    Object.keys(MEMBERS).forEach(name=>{
+      idx[name] = {name, ...MEMBERS[name], trades:[], volume:0, conflictCount:0};
+    });
+    trades.forEach(t=>{
+      if(!idx[t.member]) idx[t.member] = {name:t.member,party:t.party,state:t.state,chamber:t.chamber,trades:[],volume:0,conflictCount:0};
+      const m = idx[t.member];
+      m.trades.push(t); m.volume += t.est; if(t.isConflict) m.conflictCount++;
+    });
+    Object.values(idx).forEach(m=> m.trades = trades_sortRecent(m.trades));
+    return idx;
+  },[trades]);
+
+  const toggleWatch = useCallback((name)=>{
+    setWatch(w=> w.includes(name) ? w.filter(x=>x!==name) : [...w, name]);
+  },[]);
+
+  function openMember(name){ setMemberView(name); setView("members"); }
+  function openCommittee(id){ setCommitteeView(id); setView("committees"); }
+
+  /* nav resets drill-downs */
+  function go(v){
+    setView(v);
+    if(v!=="members") setMemberView(null);
+    if(v!=="committees") setCommitteeView(null);
+  }
+
+  let body;
+  if(view==="feed") body = <Feed trades={trades} onOpen={setDetail} />;
+  else if(view==="members") body = memberView
+      ? <MemberProfile name={memberView} index={index} watch={watch} toggleWatch={toggleWatch} onOpen={setDetail} onBack={()=>setMemberView(null)} />
+      : <MembersList index={index} watch={watch} toggleWatch={toggleWatch} onPick={setMemberView} />;
+  else if(view==="committees") body = committeeView
+      ? <CommitteeDetail id={committeeView} index={index} trades={trades} onOpenMember={openMember} onOpen={setDetail} onBack={()=>setCommitteeView(null)} />
+      : <CommitteesList trades={trades} onPick={setCommitteeView} />;
+  else if(view==="trends") body = <Trends trades={trades} />;
+  else if(view==="watch") body = <Watchlist watch={watch} index={index} toggleWatch={toggleWatch} onPick={openMember} onOpen={setDetail} />;
+
+  const navItems = [
+    ["feed","Feed",I.feed],["members","Members",I.members],
+    ["committees","Committees",I.committees],["trends","Trends",I.trends],
+    ["watch","Watch",I.watch]
+  ];
+  const statusItems = [["senate","Sen",status.senate],["house","House",status.house],["capitol","Cap",status.capitol]];
+
+  return (
+    <div className="shell">
+      <header className="hdr">
+        <div className="hdr-row">
+          <div>
+            <h1 className="hdr-title">Capitol Watch<span className="dot">.</span></h1>
+            <p className="hdr-sub">Congressional Trade Tracker</p>
+            <button className="refresh-btn" onClick={()=>{ if(!refreshing) loadLive(); }} title="Refresh now">
+              <span className={"refresh-ico"+(refreshing?" spin":"")}>↻</span>
+              {refreshing ? "Updating…" : ("Updated " + timeAgoShort(lastUpdated))}
+            </button>
+          </div>
+          <div className="status">
+            {statusItems.map(([k,label,st])=>(
+              <div key={k} className="status-item" title={label+": "+st}>
+                <span className={"status-dot "+st}></span>
+                <span className="status-label">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </header>
+
+      {body}
+
+      <p className="footer-note">
+        {liveOk ? "Live data via Supabase." : "Sample data (offline fallback)."} Disclosures of U.S. legislators are public record under the STOCK Act.
+        Conflict flags are heuristic, not allegations of wrongdoing.
+      </p>
+
+      {detail && <DetailSheet t={detail} onClose={()=>setDetail(null)} onMember={openMember} />}
+
+      <nav className="nav">
+        {navItems.map(([k,label,icon])=>(
+          <button key={k} className={"nav-btn"+(view===k?" on":"")} onClick={()=>go(k)}>
+            <span className="ni">{icon()}</span>
+            <span>{label}{k==="watch" && watch.length>0 ? " ("+watch.length+")" : ""}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+
+<script>
+/* Transpile the app source with the CLASSIC JSX runtime, then run it. */
+(function(){
+  try{
+    var src = document.getElementById("app-src").textContent;
+    var out = Babel.transform(src, { presets: [["react", { runtime: "classic" }]] }).code;
+    var el = document.createElement("script");
+    el.appendChild(document.createTextNode(out));
+    document.body.appendChild(el);
+  }catch(err){
+    console.error("Capitol Watch boot error:", err);
+    var r = document.getElementById("root");
+    if(r){ r.innerHTML = '<pre style="padding:24px;color:#C1392B;font:13px/1.6 monospace;white-space:pre-wrap">Capitol Watch failed to start — ' + ((err && err.message) || err) + '</pre>'; }
+  }
+})();
+</script>
+</body>
+</html>

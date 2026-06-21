@@ -1,0 +1,12 @@
+# dry-run scrape output + sector lookup cache
+ingest/out_trades.csv
+out_trades.csv
+ingest/sector_cache.json
+
+# python
+__pycache__/
+*.pyc
+
+# never commit secrets — the service key belongs in env / GitHub Secrets only
+.env
+*.secret
