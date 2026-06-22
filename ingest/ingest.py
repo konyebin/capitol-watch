@@ -256,8 +256,12 @@ def upsert(rows, key):
             "apikey": key, "Authorization": "Bearer " + key,
             "Content-Type": "application/json", "User-Agent": UA,
             "Prefer": "resolution=merge-duplicates,return=minimal"})
-        with request.urlopen(req, timeout=60):
-            done += len(chunk)
+        try:
+            with request.urlopen(req, timeout=60):
+                done += len(chunk)
+        except Exception as e:
+            log("DEBUG: upsert failed: %s | response: %s" % (e, getattr(e, 'read', lambda: 'N/A')().decode()[:200] if hasattr(e, 'read') else 'N/A'))
+            raise
     return done
 
 
