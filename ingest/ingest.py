@@ -247,6 +247,7 @@ def build_rows(report, txns, roster):
 # ---------- Supabase sink ----------
 
 def upsert(rows, key):
+    log("DEBUG: key starts with %s (len %d)" % ((key[:14] + "…") if key else "(EMPTY)", len(key) if key else 0))
     url = "%s/rest/v1/%s?on_conflict=external_id" % (SUPABASE_URL, TABLE)
     done = 0
     for i in range(0, len(rows), 200):
