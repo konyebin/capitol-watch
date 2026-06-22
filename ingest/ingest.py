@@ -31,7 +31,7 @@ EFD = "https://efdsearch.senate.gov"
 ROSTER_URL = "https://unitedstates.github.io/congress-legislators/legislators-current.json"
 FINNHUB_KEY = (os.environ.get("FINNHUB_API_KEY") or "").strip()
 CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sector_cache.json")
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36"
+UA = "CapitolWatch-Scraper/1.0 (Python)"
 
 # Fast offline path for common tickers: ticker -> (company, sector).
 SECTORS = {
@@ -247,7 +247,6 @@ def build_rows(report, txns, roster):
 # ---------- Supabase sink ----------
 
 def upsert(rows, key):
-    log("DEBUG: key starts with %s (len %d)" % ((key[:14] + "…") if key else "(EMPTY)", len(key) if key else 0))
     url = "%s/rest/v1/%s?on_conflict=external_id" % (SUPABASE_URL, TABLE)
     done = 0
     for i in range(0, len(rows), 200):
@@ -256,12 +255,8 @@ def upsert(rows, key):
             "apikey": key, "Authorization": "Bearer " + key,
             "Content-Type": "application/json", "User-Agent": UA,
             "Prefer": "resolution=merge-duplicates,return=minimal"})
-        try:
-            with request.urlopen(req, timeout=60):
-                done += len(chunk)
-        except Exception as e:
-            log("DEBUG: upsert failed: %s | response: %s" % (e, getattr(e, 'read', lambda: 'N/A')().decode()[:200] if hasattr(e, 'read') else 'N/A'))
-            raise
+        with request.urlopen(req, timeout=60):
+            done += len(chunk)
     return done
 
 
