@@ -1324,13 +1324,30 @@ function App(){
     setRefreshing(false);
   },[]);
 
-  /* fetch on mount, auto-refresh every 5 min, and when the tab regains focus */
+  /* fetch on mount, auto-refresh every 5 min, on tab focus, and daily at 5pm ET */
   useEffect(()=>{
     loadLive();
     const poll = setInterval(loadLive, 5*60*1000);
     const onFocus = ()=>loadLive();
     window.addEventListener("focus", onFocus);
-    return ()=>{ clearInterval(poll); window.removeEventListener("focus", onFocus); };
+
+    // Schedule daily refresh at 5pm ET
+    const scheduleDaily5pmET = ()=>{
+      const now = new Date();
+      // Create a date for 5pm ET (17:00)
+      const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      et.setHours(17, 0, 0, 0);
+
+      // If 5pm has already passed today, schedule for tomorrow
+      if(et <= now) et.setDate(et.getDate() + 1);
+
+      const msUntil5pm = et - now;
+      const timeout = setTimeout(()=>{ loadLive(); scheduleDaily5pmET(); }, msUntil5pm);
+      return timeout;
+    };
+    const dailyTimeout = scheduleDaily5pmET();
+
+    return ()=>{ clearInterval(poll); clearTimeout(dailyTimeout); window.removeEventListener("focus", onFocus); };
   },[loadLive]);
 
   /* tick every 30s so the "updated Xm ago" label stays current */
