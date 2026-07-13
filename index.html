@@ -167,6 +167,9 @@
   .sector-tag{font-size:10.5px;color:var(--muted);background:var(--surface-2);padding:2px 7px;border-radius:5px;}
   .tcard-right{display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;flex-shrink:0;gap:6px;}
   .age{font-size:11.5px;color:var(--faint);font-weight:600;white-space:nowrap;}
+  .perf-chip{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;padding:2px 6px;border-radius:6px;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .perf-chip.up{color:var(--buy);background:var(--buy-soft);}
+  .perf-chip.down{color:var(--sell);background:var(--sell-soft);}
   .flag{font-size:10px;font-weight:700;color:var(--sell);background:var(--sell-soft);padding:3px 7px;border-radius:6px;display:inline-flex;align-items:center;gap:3px;white-space:nowrap;}
   .src-tag{font-size:9.5px;color:var(--faint);letter-spacing:.05em;text-transform:uppercase;font-weight:600;}
 
@@ -195,6 +198,22 @@
   .conflict-box .cd{font-size:12.5px;color:#6e3b33;line-height:1.5;}
   .lag-note{font-size:12px;color:var(--muted);background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 12px;margin-top:14px;line-height:1.45;}
   .lag-note b{color:var(--ink);}
+
+  /* ---------- Price performance box ---------- */
+  .perf-box{margin-top:12px;border-radius:var(--radius-sm);padding:13px 14px;border:1px solid var(--line);position:relative;overflow:hidden;}
+  .perf-box.perf-good{background:linear-gradient(180deg,var(--buy-soft),rgba(220,235,227,.35));border-color:#bcd9c9;}
+  .perf-box.perf-bad{background:linear-gradient(180deg,var(--sell-soft),rgba(243,220,216,.35));border-color:#e6c6c0;}
+  .perf-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .perf-verdict{font-weight:800;font-size:14px;letter-spacing:-.01em;color:var(--ink);}
+  .perf-pct{font-family:'DM Mono',monospace;font-weight:500;font-size:19px;font-variant-numeric:tabular-nums;}
+  .perf-pct.up{color:var(--buy);}
+  .perf-pct.down{color:var(--sell);}
+  .perf-prices{display:flex;align-items:center;gap:14px;margin-top:11px;}
+  .perf-col{display:flex;flex-direction:column;gap:2px;}
+  .perf-lab{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+  .perf-val{font-size:16px;font-weight:500;color:var(--ink);}
+  .perf-arrow{color:var(--faint);font-size:16px;}
+  .perf-note{margin-top:10px;font-size:11.5px;color:var(--muted);line-height:1.45;}
   .linklike{color:var(--accent);font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer;background:none;border:0;padding:0;font-size:inherit;}
 
   /* ---------- Member / committee rows ---------- */
@@ -572,6 +591,24 @@ function timeAgoShort(d){
 function lagDays(t){
   return Math.max(0, Math.round((new Date(t.filingDate) - new Date(t.tradeDate)) / 86400000));
 }
+/* price move since the trade + a hindsight timing verdict */
+function priceInfo(t){
+  const p0 = parseFloat(t.priceAtTrade), p1 = parseFloat(t.priceCurrent);
+  if(!isFinite(p0) || !isFinite(p1) || p0 <= 0) return null;
+  const pct = ((p1 - p0) / p0) * 100;
+  const up = pct >= 0;
+  // verdict: did the trade direction look smart given the move?
+  let verdict, good;
+  if(t.type === "buy"){
+    good = up;
+    verdict = up ? "Well-timed buy" : "Underwater since";
+  }else{
+    good = !up;
+    verdict = up ? "Sold before a rise" : "Dodged the drop";
+  }
+  return { p0, p1, pct, up, verdict, good };
+}
+function fmtPct(pct){ return (pct >= 0 ? "+" : "") + pct.toFixed(1) + "%"; }
 function fmtDate(iso){
   try{ return new Date(iso+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
   catch(e){ return iso; }
@@ -611,7 +648,10 @@ function normalizeLive(json, sourceName){
         state: pick(raw,["state"]),
         chamber: pick(raw,["chamber"]),
         company: pick(raw,["company"]),
-        sector: pick(raw,["sector"])
+        sector: pick(raw,["sector"]),
+        priceAtTrade: pick(raw,["price_at_trade","priceAtTrade"]),
+        priceCurrent: pick(raw,["price_current","priceCurrent"]),
+        priceUpdated: pick(raw,["price_updated","priceUpdated"])
       }));
     }catch(e){ /* skip bad row */ }
   });
@@ -751,6 +791,9 @@ function TradeCard({ t, onOpen }){
       </span>
       <span className="tcard-right">
         <span className="age">{ageLabel(t.tradeDate)}</span>
+        {(()=>{ const pi = priceInfo(t); return pi ? (
+          <span className={"perf-chip " + (pi.up ? "up" : "down")}>{fmtPct(pi.pct)}</span>
+        ) : null; })()}
         {t.isConflict && <span className="flag">{I.flag()} conflict</span>}
         <span className="src-tag">{t.source}</span>
       </span>
@@ -766,6 +809,7 @@ function DetailSheet({ t, onClose, onMember }){
   },[]);
   if(!t) return null;
   const lag = lagDays(t);
+  const pi = priceInfo(t);
   return (
     <>
       <div className="overlay" onClick={onClose}></div>
@@ -803,6 +847,29 @@ function DetailSheet({ t, onClose, onMember }){
             <b>Disclosure lag:</b> filed {fmtDate(t.filingDate)} — <b>{lag} day{lag===1?"":"s"}</b> after the trade.
             {lag>45 ? " Exceeds the 45-day STOCK Act window." : " Within the 45-day STOCK Act window."}
           </div>
+
+          {pi && (
+            <div className={"perf-box " + (pi.good ? "perf-good" : "perf-bad")}>
+              <div className="perf-head">
+                <span className="perf-verdict">{pi.verdict}</span>
+                <span className={"perf-pct " + (pi.up ? "up" : "down")}>{fmtPct(pi.pct)}</span>
+              </div>
+              <div className="perf-prices">
+                <div className="perf-col">
+                  <span className="perf-lab">At trade</span>
+                  <span className="perf-val mono">${pi.p0.toFixed(2)}</span>
+                </div>
+                <span className="perf-arrow">→</span>
+                <div className="perf-col">
+                  <span className="perf-lab">Today</span>
+                  <span className="perf-val mono">${pi.p1.toFixed(2)}</span>
+                </div>
+              </div>
+              <div className="perf-note">
+                {t.ticker} is {pi.up ? "up" : "down"} {Math.abs(pi.pct).toFixed(1)}% since {t.member.split(" ").slice(-1)[0]} {t.type === "buy" ? "bought" : "sold"} on {fmtDate(t.tradeDate)}.
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

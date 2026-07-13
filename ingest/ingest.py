@@ -20,14 +20,16 @@ The Finnhub *free* tier cannot read congressional-trading (premium); it is used 
 only for company-profile sectors. To add the House or use Finnhub trade data directly,
 upgrade the plan and add a fetch_* adapter returning the same row dicts.
 """
-import argparse, csv, html, json, os, re, sys, time
-from datetime import datetime, timedelta
+import argparse, csv, html, io, json, os, re, sys, time, zipfile
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
 from http.cookiejar import CookieJar
 from urllib import request, parse
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://bywwvjljyhfpxpaestta.supabase.co")
 TABLE = "congress_trades"
 EFD = "https://efdsearch.senate.gov"
+HOUSE = "https://disclosures-clerk.house.gov"
 ROSTER_URL = "https://unitedstates.github.io/congress-legislators/legislators-current.json"
 FINNHUB_KEY = (os.environ.get("FINNHUB_API_KEY") or "").strip()
 CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sector_cache.json")
@@ -244,6 +246,182 @@ def build_rows(report, txns, roster):
     return rows
 
 
+# ---------- House eFD source (PDF PTRs from the Clerk's bulk download) ----------
+
+# House amount ranges are a fixed ladder; map a lower bound to the full label
+# so we can recover rows where pdfplumber splits the amount across columns.
+HOUSE_AMOUNTS = {
+    "1,001": "$1,001 - $15,000", "15,001": "$15,001 - $50,000",
+    "50,001": "$50,001 - $100,000", "100,001": "$100,001 - $250,000",
+    "250,001": "$250,001 - $500,000", "500,001": "$500,001 - $1,000,000",
+    "1,000,001": "$1,000,001 - $5,000,000", "5,000,001": "$5,000,001 - $25,000,000",
+    "25,000,001": "$25,000,001 - $50,000,000",
+}
+_H_AMOUNT_RANGE = re.compile(r"\$[\d,]+\s*-\s*\$[\d,]+")
+_H_AMOUNT_LOW = re.compile(r"\$([\d,]+)")
+_H_DATE = re.compile(r"\b(\d{2}/\d{2}/\d{4})\b")
+_H_TICKER = re.compile(r"\(([A-Z][A-Z.]{0,5})\)\s*(?:\n|\s)*\[")
+_H_TYPE = re.compile(r"\b(S \(partial\)|P \(partial\)|P|S|E)\b")
+
+
+def http_bytes(opener, url, timeout=40):
+    req = request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
+    with opener.open(req, timeout=timeout) as r:
+        return r.read()
+
+
+def house_amount(joined):
+    m = _H_AMOUNT_RANGE.search(joined)
+    if m:
+        return re.sub(r"\s+", " ", m.group(0))
+    m = _H_AMOUNT_LOW.search(joined)
+    if m:
+        return HOUSE_AMOUNTS.get(m.group(1))
+    return None
+
+
+def fetch_house_reports(op, year, since_iso):
+    """PTR filings from the House Clerk's annual FD zip (XML index)."""
+    raw = http_bytes(op, "%s/public_disc/financial-pdfs/%sFD.zip" % (HOUSE, year))
+    z = zipfile.ZipFile(io.BytesIO(raw))
+    root = ET.fromstring(z.read("%sFD.xml" % year))
+    reports = []
+    for m in root.findall("Member"):
+        if m.findtext("FilingType") != "P":     # P = Periodic Transaction Report
+            continue
+        filed = to_iso(m.findtext("FilingDate") or "")
+        if since_iso and filed and filed < since_iso:
+            continue
+        reports.append({
+            "first": (m.findtext("First") or "").strip(),
+            "last": (m.findtext("Last") or "").strip(),
+            "doc": (m.findtext("DocID") or "").strip(),
+            "year": (m.findtext("Year") or year).strip(),
+            "filed": (m.findtext("FilingDate") or "").strip(),
+            "state": (m.findtext("StateDst") or "")[:2],
+        })
+    return reports
+
+
+def parse_house_pdf(op, doc, year):
+    """Extract transactions from a House PTR PDF via table structure."""
+    import pdfplumber
+    raw = http_bytes(op, "%s/public_disc/ptr-pdfs/%s/%s.pdf" % (HOUSE, year, doc))
+    out = []
+    with pdfplumber.open(io.BytesIO(raw)) as pdf:
+        for page in pdf.pages:
+            for table in page.extract_tables():
+                for row in table:
+                    cells = [(c or "").replace("\n", " ") for c in row]
+                    joined = " ".join(cells)
+                    mt = _H_TICKER.search(joined)
+                    if not mt:
+                        continue                # not a transaction row
+                    typ = None
+                    for c in cells:             # prefer a standalone type cell
+                        cs = c.strip()
+                        if cs in ("P", "S", "E") or cs.startswith("S (partial)") or cs.startswith("P (partial)"):
+                            typ = cs
+                            break
+                    if not typ:
+                        m2 = _H_TYPE.search(joined)
+                        typ = m2.group(1) if m2 else None
+                    md = _H_DATE.search(joined)
+                    amt = house_amount(joined)
+                    if mt and typ and md and amt:
+                        out.append({"num": str(len(out) + 1), "ticker": mt.group(1),
+                                    "ttype": typ, "txn_date": md.group(1), "amount": amt})
+    return out
+
+
+def build_house_rows(report, txns, roster):
+    member = clean_name(report["first"], report["last"])
+    party, state, chamber = roster.get(member.lower(), ("I", report["state"] or "—", "House"))
+    filed = to_iso(report["filed"])
+    rows = []
+    for tx in txns:
+        ticker = tx["ticker"].upper().strip()
+        if not re.fullmatch(r"[A-Z][A-Z.]{0,5}", ticker):
+            continue
+        typ = norm_house_type(tx["ttype"])
+        td = to_iso(tx["txn_date"])
+        if not typ or not td:
+            continue
+        company, sector = resolve_ticker(ticker, "")
+        rows.append({
+            "external_id": "house:%s:%s" % (report["doc"], tx["num"]),
+            "member": member, "party": party, "state": state, "chamber": "House",
+            "ticker": ticker, "company": company, "sector": sector, "type": typ,
+            "amount": tx["amount"].replace(" - ", " – "),
+            "trade_date": td, "filing_date": filed, "source": "House",
+        })
+    return rows
+
+
+def norm_house_type(t):
+    t = t.lower()
+    if t.startswith("p"):
+        return "buy"
+    if t.startswith("s") or t.startswith("e"):
+        return "sell"
+    return None
+
+
+# ---------- price enrichment (Yahoo Finance chart API: free, no key) ----------
+
+_price_cache = {}   # ticker -> list of (iso_date, close) sorted ascending, or None
+
+
+def yahoo_daily(ticker):
+    """Daily close history (up to 2y) for a US ticker via Yahoo chart API. Cached per run."""
+    if ticker in _price_cache:
+        return _price_cache[ticker]
+    sym = ticker.replace(".", "-")   # BRK.B -> BRK-B
+    url = "https://query1.finance.yahoo.com/v8/finance/chart/%s?range=2y&interval=1d" % sym
+    hist = None
+    try:
+        d = json.loads(http(_plain, url, timeout=20))
+        res = d["chart"]["result"][0]
+        ts = res["timestamp"]
+        closes = res["indicators"]["quote"][0]["close"]
+        rows = []
+        for t, c in zip(ts, closes):
+            if c is None:
+                continue
+            iso = datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%d")
+            rows.append((iso, float(c)))
+        hist = rows or None
+    except Exception:
+        hist = None
+    _price_cache[ticker] = hist
+    time.sleep(0.2)                  # be polite to Yahoo
+    return hist
+
+
+def enrich_prices(rows):
+    """Attach price_at_trade (close on/just-before trade_date) and price_current."""
+    now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    priced = 0
+    for r in rows:
+        hist = yahoo_daily(r["ticker"])
+        if not hist:
+            continue
+        cur = hist[-1][1]
+        pat = None
+        for d, c in hist:            # history is ascending by date
+            if d <= r["trade_date"]:
+                pat = c
+            else:
+                break
+        if pat is None:
+            continue
+        r["price_at_trade"] = round(pat, 2)
+        r["price_current"] = round(cur, 2)
+        r["price_updated"] = now_iso
+        priced += 1
+    return priced
+
+
 # ---------- Supabase sink ----------
 
 def upsert(rows, key):
@@ -265,6 +443,8 @@ def main():
     ap.add_argument("--since", default=(datetime.now() - timedelta(days=30)).strftime("%m/%d/%Y"))
     ap.add_argument("--max-reports", type=int, default=40)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--no-prices", action="store_true", help="skip Yahoo price enrichment")
+    ap.add_argument("--no-house", action="store_true", help="skip House PDF scraping")
     ap.add_argument("--out", default="out_trades.csv")
     a = ap.parse_args()
 
@@ -293,6 +473,29 @@ def main():
             log("  parse error %s: %s" % (rep["uuid"], e))
         time.sleep(0.4)
 
+    # ---- House PTRs (PDF filings from the Clerk's bulk download) ----
+    if not a.no_house:
+        try:
+            year = a.since.split("/")[-1]
+            hreports = fetch_house_reports(op, year, to_iso(a.since))
+            hreports = hreports[:a.max_reports]
+            log("House PTRs since %s: %d" % (a.since, len(hreports)))
+            hcount = 0
+            for i, rep in enumerate(hreports):
+                try:
+                    rows = build_house_rows(rep, parse_house_pdf(op, rep["doc"], rep["year"]), roster)
+                    for r in rows:
+                        by_id[r["external_id"]] = r
+                    hcount += len(rows)
+                    if rows:
+                        log("  [H %d/%d] %s -> %d trades" % (i + 1, len(hreports), rep["last"], len(rows)))
+                except Exception as e:
+                    log("  House parse error %s: %s" % (rep["doc"], e))
+                time.sleep(0.3)
+            log("House trades parsed: %d" % hcount)
+        except Exception as e:
+            log("House scrape skipped: %s" % e)
+
     try:
         json.dump(_cache, open(CACHE_FILE, "w", encoding="utf-8"))
     except Exception:
@@ -301,6 +504,10 @@ def main():
     rows = sorted(by_id.values(), key=lambda r: r["trade_date"], reverse=True)
     sectored = sum(1 for r in rows if r["sector"] != "Other")
     log("normalized trades: %d (%d with a known sector)" % (len(rows), sectored))
+
+    if not a.no_prices:
+        priced = enrich_prices(rows)
+        log("price snapshots: %d/%d trades (Yahoo)" % (priced, len(rows)))
 
     key = (os.environ.get("SUPABASE_SERVICE_KEY") or "").strip()
     if a.dry_run or not key:
