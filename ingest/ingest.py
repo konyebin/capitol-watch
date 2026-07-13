@@ -242,6 +242,7 @@ def build_rows(report, txns, roster):
             "ticker": ticker, "company": company, "sector": sector, "type": typ,
             "amount": tx["amount"].replace(" - ", " – "),
             "trade_date": td, "filing_date": filed, "source": "Senate",
+            "price_at_trade": None, "price_current": None, "price_updated": None,
         })
     return rows
 
@@ -354,6 +355,7 @@ def build_house_rows(report, txns, roster):
             "ticker": ticker, "company": company, "sector": sector, "type": typ,
             "amount": tx["amount"].replace(" - ", " – "),
             "trade_date": td, "filing_date": filed, "source": "House",
+            "price_at_trade": None, "price_current": None, "price_updated": None,
         })
     return rows
 
