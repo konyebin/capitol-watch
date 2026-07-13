@@ -290,6 +290,12 @@
 
   /* ---------- Trends ---------- */
   .bar-row{margin-bottom:11px;}
+  .mover-controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .seg{display:inline-flex;background:var(--surface-2);border-radius:8px;padding:2px;gap:2px;}
+  .seg-btn{border:0;background:transparent;color:var(--muted);font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:6px;transition:.15s var(--ease);white-space:nowrap;}
+  .seg-btn.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(26,23,20,.08);}
+  .seg-btn:active{transform:scale(.96);}
+  .mover-sub{font-size:10.5px;color:var(--faint);margin-top:4px;font-weight:500;}
   .bar-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;gap:10px;}
   .bar-label{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;}
   .bar-label .tk{font-family:'DM Mono',monospace;}
@@ -1171,6 +1177,39 @@ function CommitteeDetail({ id, index, trades, onOpenMember, onOpen, onBack }){
    TRENDS
 ============================================================ */
 function Trends({ trades }){
+  const [group, setGroup] = useState("All");
+  const [metric, setMetric] = useState("move");   // "move" | "activity"
+
+  const movers = useMemo(()=>{
+    const inGroup = (t)=>{
+      if(group === "All") return true;
+      if(group === "Senate" || group === "House") return t.chamber === group;
+      return t.party === group;   // D / R
+    };
+    const map = {};
+    trades.filter(inGroup).forEach(t=>{
+      const m = (map[t.ticker] = map[t.ticker] || {
+        ticker:t.ticker, company:t.company, n:0, priced:0, sumAbs:0, sumSigned:0, buys:0, sells:0
+      });
+      m.n++;
+      if(t.type === "buy") m.buys++; else m.sells++;
+      const pi = priceInfo(t);
+      if(pi){ m.priced++; m.sumAbs += Math.abs(pi.pct); m.sumSigned += pi.pct; }
+    });
+    let arr = Object.values(map);
+    if(metric === "move"){
+      arr = arr.filter(m=>m.priced>0)
+        .map(m=>({...m, avgAbs:m.sumAbs/m.priced, avgSigned:m.sumSigned/m.priced}))
+        .sort((a,b)=>b.avgAbs-a.avgAbs);
+    }else{
+      arr = arr.sort((a,b)=>b.n-a.n);
+    }
+    return arr.slice(0,10);
+  },[trades, group, metric]);
+
+  const maxMover = Math.max(1, ...movers.map(m=> metric==="move" ? m.avgAbs : m.n));
+  const GROUPS = [["All","All"],["D","Dem"],["R","Rep"],["Senate","Senate"],["House","House"]];
+
   const stats = useMemo(()=>{
     const byTicker={}, bySector={}, byParty={D:{n:0,v:0},R:{n:0,v:0},I:{n:0,v:0}};
     trades.forEach(t=>{
@@ -1190,7 +1229,6 @@ function Trends({ trades }){
              volume: trades.reduce((s,t)=>s+t.est,0) };
   },[trades]);
 
-  const maxTick = Math.max(1, ...stats.tickers.map(t=>t.n));
   const maxSec = Math.max(1, ...stats.sectors.map(s=>s.v));
   const pv = stats.byParty.D.v + stats.byParty.R.v || 1;
   const dPct = Math.round(stats.byParty.D.v/pv*100);
@@ -1223,16 +1261,51 @@ function Trends({ trades }){
       />
 
       <div className="card">
-        <div className="card-h">Most traded tickers</div>
-        {stats.tickers.map(t=>(
-          <div key={t.ticker} className="bar-row">
-            <div className="bar-top">
-              <span className="bar-label"><span className="tk">{t.ticker}</span> <span style={{color:"var(--muted)",fontWeight:400,fontSize:12}}>{t.company}</span></span>
-              <span className="bar-val">{t.n}×</span>
-            </div>
-            <div className="bar-track"><div className="bar-fill" style={{width:(t.n/maxTick*100)+"%",background:"var(--accent)"}}></div></div>
+        <div className="card-h">
+          Biggest movers
+          <span className="cnt">{metric==="move" ? "avg move since trade" : "by trade count"}</span>
+        </div>
+        <div className="mover-controls">
+          <div className="seg">
+            {GROUPS.map(([val,lab])=>(
+              <button key={val} className={"seg-btn"+(group===val?" on":"")} onClick={()=>setGroup(val)}>{lab}</button>
+            ))}
           </div>
-        ))}
+          <div className="seg">
+            <button className={"seg-btn"+(metric==="move"?" on":"")} onClick={()=>setMetric("move")}>Price move</button>
+            <button className={"seg-btn"+(metric==="activity"?" on":"")} onClick={()=>setMetric("activity")}>Activity</button>
+          </div>
+        </div>
+        {movers.length===0 ? (
+          <div className="comm-reg">No priced trades in this group yet.</div>
+        ) : movers.map(m=>{
+          const val = metric==="move" ? m.avgSigned : m.n;
+          const mag = metric==="move" ? m.avgAbs : m.n;
+          const up = m.avgSigned >= 0;
+          return (
+            <div key={m.ticker} className="bar-row">
+              <div className="bar-top">
+                <span className="bar-label">
+                  <span className="tk">{m.ticker}</span>{" "}
+                  <span style={{color:"var(--muted)",fontWeight:400,fontSize:12}}>{m.company}</span>
+                </span>
+                <span className="bar-val" style={metric==="move"?{color:up?"var(--buy)":"var(--sell)"}:{}}>
+                  {metric==="move" ? fmtPct(m.avgSigned) : (m.n+"×")}
+                </span>
+              </div>
+              <div className="bar-track">
+                <div className="bar-fill" style={{
+                  width:(mag/maxMover*100)+"%",
+                  background: metric==="move" ? (up?"var(--buy)":"var(--sell)") : "var(--accent)"
+                }}></div>
+              </div>
+              <div className="mover-sub">
+                {m.n} trade{m.n===1?"":"s"} · {m.buys} buy · {m.sells} sell
+                {metric==="move" && m.priced<m.n ? " · "+m.priced+" priced" : ""}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="card">
