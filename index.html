@@ -296,6 +296,7 @@
   .seg-btn.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(26,23,20,.08);}
   .seg-btn:active{transform:scale(.96);}
   .mover-sub{font-size:10.5px;color:var(--faint);margin-top:4px;font-weight:500;}
+  .more-note{text-align:center;font-size:12px;color:var(--muted);padding:16px 12px 4px;line-height:1.5;}
   .bar-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;gap:10px;}
   .bar-label{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;}
   .bar-label .tk{font-family:'DM Mono',monospace;}
@@ -668,23 +669,32 @@ function sig(t){ return [t.member,t.ticker,t.tradeDate,t.type].join("|").toLower
 /* Fetch one source's rows from Supabase (PostgREST). Throws on non-2xx so the
    caller can mark that source's status dot red and fall back to sample data. */
 async function fetchTradesBySource(source){
-  const url = SUPABASE_URL + "/rest/v1/" + TRADES_TABLE +
+  // PostgREST caps each response at ~1000 rows, so page through with Range headers.
+  const base = SUPABASE_URL + "/rest/v1/" + TRADES_TABLE +
     "?select=*&source=eq." + encodeURIComponent(source) +
     "&order=trade_date.desc";
-  const ctrl = new AbortController();
-  const to = setTimeout(()=>ctrl.abort(), 7000);
-  try{
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: "Bearer " + SUPABASE_KEY,
-        accept: "application/json"
-      }
-    });
-    if(!res.ok) throw new Error("HTTP " + res.status);
-    return await res.json();
-  } finally { clearTimeout(to); }
+  const PAGE = 1000;
+  let all = [];
+  for(let offset = 0; offset < 20000; offset += PAGE){   // hard stop at 20k
+    const ctrl = new AbortController();
+    const to = setTimeout(()=>ctrl.abort(), 8000);
+    try{
+      const res = await fetch(base, {
+        signal: ctrl.signal,
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: "Bearer " + SUPABASE_KEY,
+          accept: "application/json",
+          Range: offset + "-" + (offset + PAGE - 1)
+        }
+      });
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      const page = await res.json();
+      all = all.concat(page);
+      if(page.length < PAGE) break;   // last page
+    } finally { clearTimeout(to); }
+  }
+  return all;
 }
 
 /* ============================================================
@@ -885,6 +895,7 @@ function DetailSheet({ t, onClose, onMember }){
 /* ============================================================
    FEED
 ============================================================ */
+const RENDER_CAP = 150;
 function Feed({ trades, onOpen }){
   const [chamber, setChamber] = useState("All");
   const [source, setSource] = useState("All");
@@ -946,7 +957,12 @@ function Feed({ trades, onOpen }){
       <div className="stack">
         {filtered.length===0
           ? <div className="empty"><span className="big">⌀</span>No trades match these filters.</div>
-          : filtered.map(t=> <TradeCard key={t.id} t={t} onOpen={onOpen} />)}
+          : filtered.slice(0, RENDER_CAP).map(t=> <TradeCard key={t.id} t={t} onOpen={onOpen} />)}
+        {filtered.length > RENDER_CAP && (
+          <div className="more-note">
+            Showing the {RENDER_CAP} most recent of {filtered.length} trades. Use search or filters to narrow.
+          </div>
+        )}
       </div>
     </div>
   );

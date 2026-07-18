@@ -235,6 +235,8 @@ def build_rows(report, txns, roster):
         td = to_iso(tx["txn_date"])
         if not typ or not td:
             continue
+        if td > datetime.now().strftime("%Y-%m-%d"):   # guard against mis-parse
+            continue
         company, sector = resolve_ticker(ticker, tx["asset"])
         rows.append({
             "external_id": "senate:%s:%s" % (report["uuid"], tx["num"]),
@@ -368,6 +370,8 @@ def build_house_rows(report, txns, roster):
         typ = norm_house_type(tx["ttype"])
         td = to_iso(tx["txn_date"])
         if not typ or not td:
+            continue
+        if td > datetime.now().strftime("%Y-%m-%d"):   # guard against PDF mis-parse
             continue
         company, sector = resolve_ticker(ticker, "")
         rows.append({
