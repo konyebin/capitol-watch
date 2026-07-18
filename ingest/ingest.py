@@ -304,6 +304,27 @@ def fetch_house_reports(op, year, since_iso):
     return reports
 
 
+def read_house_index_file(path, since_iso):
+    """PTR filings from a locally downloaded House FD index (tab-delimited .txt).
+    Columns: Prefix, Last, First, Suffix, FilingType, StateDst, Year, FilingDate, DocID."""
+    reports = []
+    with open(path, encoding="utf-8-sig") as f:
+        reader = csv.reader(f, delimiter="\t")
+        header = next(reader, None)
+        for row in reader:
+            if len(row) < 9 or row[4] != "P":     # P = Periodic Transaction Report
+                continue
+            filed = to_iso(row[7].strip())
+            if since_iso and filed and filed < since_iso:
+                continue
+            reports.append({
+                "first": row[2].strip(), "last": row[1].strip(),
+                "doc": row[8].strip(), "year": (row[6] or "").strip(),
+                "filed": row[7].strip(), "state": (row[5] or "")[:2],
+            })
+    return reports
+
+
 def parse_house_pdf(op, doc, year):
     """Extract transactions from a House PTR PDF via table structure."""
     import pdfplumber
@@ -447,6 +468,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--no-prices", action="store_true", help="skip Yahoo price enrichment")
     ap.add_argument("--no-house", action="store_true", help="skip House PDF scraping")
+    ap.add_argument("--house-index", help="path to a locally downloaded House FD index .txt (ingest ALL its PTRs, no cap)")
     ap.add_argument("--out", default="out_trades.csv")
     a = ap.parse_args()
 
@@ -479,9 +501,13 @@ def main():
     if not a.no_house:
         try:
             year = a.since.split("/")[-1]
-            hreports = fetch_house_reports(op, year, to_iso(a.since))
-            hreports = hreports[:a.max_reports]
-            log("House PTRs since %s: %d" % (a.since, len(hreports)))
+            if a.house_index:
+                hreports = read_house_index_file(a.house_index, to_iso(a.since))
+                log("House PTRs from local index %s: %d (no cap)" % (a.house_index, len(hreports)))
+            else:
+                hreports = fetch_house_reports(op, year, to_iso(a.since))
+                hreports = hreports[:a.max_reports]
+                log("House PTRs since %s: %d" % (a.since, len(hreports)))
             hcount = 0
             for i, rep in enumerate(hreports):
                 try:
