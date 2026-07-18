@@ -7,7 +7,17 @@ name: Ingest congressional trades
 on:
   schedule:
     - cron: "17 6 * * *"      # every day at 06:17 UTC
-  workflow_dispatch: {}        # allow manual runs from the Actions tab
+  workflow_dispatch:           # allow manual runs from the Actions tab
+    inputs:
+      since:
+        description: "Backfill start date MM/DD/YYYY (blank = last 45 days)"
+        default: ""
+      house_index:
+        description: "Committed House index file for a full-year backfill (blank = live 45-day scrape)"
+        default: ""
+      max_reports:
+        description: "Max Senate reports to fetch"
+        default: "120"
 
 concurrency:
   group: ingest
@@ -28,7 +38,13 @@ jobs:
           SUPABASE_URL: https://bywwvjljyhfpxpaestta.supabase.co
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}   # optional: real sectors
+          SINCE_IN: ${{ github.event.inputs.since }}
+          HOUSE_INDEX_IN: ${{ github.event.inputs.house_index }}
+          MAX_REPORTS_IN: ${{ github.event.inputs.max_reports }}
         run: |
-          python ingest/ingest.py \
-            --since "$(date -u -d '45 days ago' +%m/%d/%Y)" \
-            --max-reports 120
+          SINCE="${SINCE_IN:-$(date -u -d '45 days ago' +%m/%d/%Y)}"
+          MAXR="${MAX_REPORTS_IN:-120}"
+          ARGS="--since $SINCE --max-reports $MAXR"
+          if [ -n "$HOUSE_INDEX_IN" ]; then ARGS="$ARGS --house-index $HOUSE_INDEX_IN"; fi
+          echo "Running: python ingest/ingest.py $ARGS"
+          python ingest/ingest.py $ARGS
